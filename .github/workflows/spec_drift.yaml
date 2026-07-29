@@ -10,15 +10,17 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
           coverage: none
           tools: composer:v2
+        env:
+          runner: ${{ vars.RUNNER_LABEL && 'self-hosted' || '' }}
 
       - run: composer update --prefer-dist --no-interaction --no-progress
 
@@ -35,7 +37,7 @@ jobs:
       # A PR is opened whenever the spec moved. If the SDK also needs new methods the
       # drift test is red on that PR — the failure output lists exactly which operations.
       - name: Open a PR with the spec change
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: chore/spec-refresh
           title: "chore: refresh OpenAPI spec"
