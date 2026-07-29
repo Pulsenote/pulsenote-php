@@ -10,7 +10,7 @@ All notable changes to this package are documented here. The format follows
 
 ### Added
 
-- Initial release. Hand-written PHP client for the Pulsenote data-plane API
+- Initial release. Hand-written PHP client (8.2+) for the Pulsenote data-plane API
   (`X-API-Key` auth), covering all 17 operations across notifications, templates, and
   domains.
 - `Pulsenote` client with `notifications`, `templates`, and `domains` groups; named

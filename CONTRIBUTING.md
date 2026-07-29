@@ -46,7 +46,7 @@ with a comment saying why — every entry is API surface a PHP user cannot reach
 make check    # phpstan level 8 + phpunit
 ```
 
-Both run in CI on PHP 8.1–8.4. No baselines, no `@phpstan-ignore`.
+Both run in CI on PHP 8.2–8.4, plus a `--prefer-lowest` job. No baselines, no `@phpstan-ignore`.
 
 ## Releasing
 
