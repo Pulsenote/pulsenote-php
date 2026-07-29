@@ -1,0 +1,44 @@
+name: Release
+"on":
+  release:
+    types: [published]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+          tools: composer:v2
+
+      - run: composer validate --strict
+
+      - run: composer update --prefer-dist --no-interaction --no-progress
+
+      - run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+
+      - run: vendor/bin/phpunit
+
+      # Packagist resolves versions from git tags, so a tag that disagrees with
+      # Pulsenote::VERSION would ship a wrong User-Agent to every customer.
+      - name: Tag must match Pulsenote::VERSION
+        if: github.event_name == 'release'
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          SRC=$(php -r 'require "src/Pulsenote.php"; echo Pulsenote\Pulsenote::VERSION;')
+          if [ "$TAG" != "$SRC" ]; then
+            echo "::error::tag $TAG does not match Pulsenote::VERSION $SRC"
+            exit 1
+          fi
+          echo "Version $SRC matches the tag."
+
+  # Publishing itself is Packagist's GitHub webhook — no token needed here. If the
+  # package is ever hosted somewhere without a webhook, add the push step below.

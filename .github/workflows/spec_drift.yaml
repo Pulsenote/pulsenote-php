@@ -1,0 +1,50 @@
+name: Spec drift
+"on":
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, matching the Node SDK's regeneration cadence
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+          tools: composer:v2
+
+      - run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Refresh the committed spec
+        run: php scripts/fetch-spec.php
+        env:
+          SPEC_URL: ${{ vars.PULSENOTE_SPEC_URL || 'https://pulsenote-api.sysgp.eu/api-json' }}
+
+      - name: Diff the SDK against it
+        id: drift
+        continue-on-error: true
+        run: vendor/bin/phpunit --filter SpecCoverageTest
+
+      # A PR is opened whenever the spec moved. If the SDK also needs new methods the
+      # drift test is red on that PR — the failure output lists exactly which operations.
+      - name: Open a PR with the spec change
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/spec-refresh
+          title: "chore: refresh OpenAPI spec"
+          commit-message: "chore: refresh OpenAPI spec"
+          body: |
+            Automated refresh of `openapi/pulsenote-api.json` from the live API.
+
+            `SpecCoverageTest` result on this run: **${{ steps.drift.outcome }}**.
+
+            If it failed, the CI log lists the operations this SDK does not yet
+            implement — see CONTRIBUTING.md for how to add them.
+          labels: sdk, automated

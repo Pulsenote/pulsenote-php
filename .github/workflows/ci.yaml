@@ -1,0 +1,51 @@
+name: CI
+"on":
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ["8.1", "8.2", "8.3", "8.4"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: json
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        # The lock file is not committed (this is a library), so resolve fresh per PHP version.
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Static analysis
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+
+      - name: Tests
+        run: vendor/bin/phpunit
+
+  lowest:
+    name: Lowest dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          coverage: none
+          tools: composer:v2
+
+      # Catches version constraints that are wider than what the code actually supports.
+      - run: composer update --prefer-lowest --prefer-dist --no-interaction --no-progress
+
+      - run: vendor/bin/phpunit
