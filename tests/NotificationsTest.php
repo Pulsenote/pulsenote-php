@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace Pulsenote\Tests;
 
+use Pulsenote\Enum\BatchMessageStatus;
 use Pulsenote\Enum\NotificationStatus;
+use Pulsenote\Exception\ConfigurationException;
+use Pulsenote\Exception\TransportException;
+use Pulsenote\Model\BatchMessage;
 use Pulsenote\Model\Notification;
+use Pulsenote\Resource\Notifications;
 use Pulsenote\Tests\Support\TestCase;
 
 final class NotificationsTest extends TestCase
@@ -20,6 +25,9 @@ final class NotificationsTest extends TestCase
             'recipient' => 'greg@example.com',
             'subject' => 'Welcome',
             'status' => 'DELIVERED',
+            'templateId' => 't-1',
+            'templateName' => 'Welcome email',
+            'fromAddress' => 'noreply@sysgp.eu',
             'providerMessageId' => 'ses-123',
             'sentAt' => '2026-07-28T10:00:00.000Z',
             'deliveredAt' => '2026-07-28T10:00:04.000Z',
@@ -96,6 +104,8 @@ final class NotificationsTest extends TestCase
         self::assertSame(NotificationStatus::Delivered, $first->status);
         self::assertTrue($first->status->isTerminal());
         self::assertSame('2026-07-28T10:00:04+00:00', $first->deliveredAt?->format(\DateTimeInterface::ATOM));
+        self::assertSame('Welcome email', $first->templateName);
+        self::assertSame('noreply@sysgp.eu', $first->fromAddress);
         self::assertNull($first->failureReason);
     }
 
@@ -192,5 +202,155 @@ final class NotificationsTest extends TestCase
 
         self::assertSame([], $ids);
         self::assertCount(1, $this->http->requests);
+    }
+    public function testListSendsTheSearchTerm(): void
+    {
+        $this->http->push(200, ['data' => [], 'meta' => ['total' => 0, 'page' => 1, 'limit' => 20, 'pages' => 0]]);
+
+        $this->client()->notifications->list(search: 'greg@example.com');
+
+        self::assertSame('search=greg%40example.com', $this->http->lastRequest()->getUri()->getQuery());
+    }
+
+    public function testAllForwardsTheSearchTermToEveryPage(): void
+    {
+        $this->http
+            ->push(200, [
+                'data' => [self::notificationPayload('n-1')],
+                'meta' => ['total' => 2, 'page' => 1, 'limit' => 1, 'pages' => 2],
+            ])
+            ->push(200, [
+                'data' => [self::notificationPayload('n-2')],
+                'meta' => ['total' => 2, 'page' => 2, 'limit' => 1, 'pages' => 2],
+            ]);
+
+        iterator_to_array($this->client()->notifications->all(pageSize: 1, search: 'welcome'), false);
+
+        self::assertCount(2, $this->http->requests);
+        self::assertSame('page=1&limit=1&search=welcome', $this->http->requests[0]->getUri()->getQuery());
+        self::assertSame('page=2&limit=1&search=welcome', $this->http->requests[1]->getUri()->getQuery());
+    }
+
+    public function testSendBatchPostsEveryMessageAndPrunesUnsetFields(): void
+    {
+        $this->http->push(202, [
+            'total' => 2,
+            'queued' => 2,
+            'rejected' => 0,
+            'results' => [
+                ['index' => 0, 'status' => 'queued', 'id' => 'n-1'],
+                ['index' => 1, 'status' => 'queued', 'id' => 'n-2'],
+            ],
+        ]);
+
+        $this->client()->notifications->sendBatch([
+            new BatchMessage(to: 'a@example.com', subject: 'Hi', html: '<b>Hi</b>'),
+            new BatchMessage(to: 'b@example.com', templateSlug: 'welcome', locale: 'pl', templateData: ['name' => 'Greg']),
+        ]);
+
+        $request = $this->http->lastRequest();
+        self::assertSame('POST', $request->getMethod());
+        self::assertSame('/api/v1/notifications/batch', $request->getUri()->getPath());
+        self::assertSame('application/json', $request->getHeaderLine('Content-Type'));
+
+        // Nested nulls are pruned by the message itself — the transport only prunes the top level.
+        self::assertSame([
+            'messages' => [
+                ['to' => 'a@example.com', 'subject' => 'Hi', 'html' => '<b>Hi</b>'],
+                ['to' => 'b@example.com', 'templateSlug' => 'welcome', 'locale' => 'pl', 'templateData' => ['name' => 'Greg']],
+            ],
+        ], $this->http->lastBody());
+    }
+
+    public function testSendBatchReportsPartialSuccess(): void
+    {
+        $this->http->push(202, [
+            'total' => 3,
+            'queued' => 2,
+            'rejected' => 1,
+            'results' => [
+                ['index' => 0, 'status' => 'queued', 'id' => 'n-1'],
+                ['index' => 1, 'status' => 'rejected', 'error' => 'Domain not verified'],
+                ['index' => 2, 'status' => 'queued', 'id' => 'n-3'],
+            ],
+        ]);
+
+        $batch = $this->client()->notifications->sendBatch([
+            new BatchMessage(to: 'a@example.com', html: 'a'),
+            new BatchMessage(to: 'b@nope.com', html: 'b'),
+            new BatchMessage(to: 'c@example.com', html: 'c'),
+        ]);
+
+        // A 202 with rejections must not read as success.
+        self::assertFalse($batch->isCompletelySuccessful());
+        self::assertSame(3, $batch->total);
+        self::assertSame(2, $batch->queued);
+        self::assertSame(1, $batch->rejected);
+        self::assertCount(3, $batch);
+        self::assertSame(['n-1', 'n-3'], $batch->queuedIds());
+
+        $rejections = $batch->rejections();
+        self::assertCount(1, $rejections);
+        self::assertSame(1, $rejections[0]->index);
+        self::assertSame(BatchMessageStatus::Rejected, $rejections[0]->status);
+        self::assertSame('Domain not verified', $rejections[0]->error);
+        self::assertNull($rejections[0]->id);
+        self::assertFalse($rejections[0]->isQueued());
+    }
+
+    public function testSendBatchIsIterable(): void
+    {
+        $this->http->push(202, [
+            'total' => 1,
+            'queued' => 1,
+            'rejected' => 0,
+            'results' => [['index' => 0, 'status' => 'queued', 'id' => 'n-1']],
+        ]);
+
+        $batch = $this->client()->notifications->sendBatch([new BatchMessage(to: 'a@example.com', html: 'a')]);
+
+        $ids = [];
+        foreach ($batch as $result) {
+            $ids[] = $result->id;
+        }
+
+        self::assertSame(['n-1'], $ids);
+        self::assertTrue($batch->isCompletelySuccessful());
+    }
+
+    public function testSendBatchRejectsAnEmptyBatch(): void
+    {
+        $this->expectException(ConfigurationException::class);
+
+        $this->client()->notifications->sendBatch([]);
+    }
+
+    public function testSendBatchRejectsAnOversizedBatchWithoutCallingTheApi(): void
+    {
+        $messages = array_fill(0, Notifications::MAX_BATCH + 1, new BatchMessage(to: 'a@example.com', html: 'a'));
+
+        try {
+            $this->client()->notifications->sendBatch($messages);
+            self::fail('Expected a ConfigurationException.');
+        } catch (ConfigurationException $e) {
+            self::assertStringContainsString('at most 500 messages', $e->getMessage());
+        }
+
+        self::assertSame([], $this->http->requests);
+    }
+
+    public function testSendBatchSurfacesAnUnknownPerMessageStatus(): void
+    {
+        // Guards against a silently-dropped outcome if the API grows a third status.
+        $this->http->push(202, [
+            'total' => 1,
+            'queued' => 0,
+            'rejected' => 0,
+            'results' => [['index' => 0, 'status' => 'deferred']],
+        ]);
+
+        $this->expectException(TransportException::class);
+
+        $this->client()->notifications->sendBatch([new BatchMessage(to: 'a@example.com', html: 'a')]);
     }
 }

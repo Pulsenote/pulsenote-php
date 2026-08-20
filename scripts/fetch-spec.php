@@ -5,7 +5,7 @@ declare(strict_types=1);
 /*
  * Refresh openapi/pulsenote-api.json from the live API spec.
  *
- *   php scripts/fetch-spec.php                       # default: https://pulsenote-api.sysgp.eu/api-json
+ *   php scripts/fetch-spec.php                       # default: https://pulsenote.eu/openapi.json
  *   SPEC_URL=http://localhost:3000/api-json php scripts/fetch-spec.php
  *
  * Filters the full spec down to the data plane — operations authenticated with
@@ -16,7 +16,8 @@ declare(strict_types=1);
  * to-do list of endpoints to hand-write.
  */
 
-$specUrl = getenv('SPEC_URL') ?: 'https://pulsenote-api.sysgp.eu/api-json';
+// The public spec is the released contract; the internal sysgp.eu host is not always up.
+$specUrl = getenv('SPEC_URL') ?: 'https://pulsenote.eu/openapi.json';
 $target = __DIR__ . '/../openapi/pulsenote-api.json';
 
 fwrite(STDERR, "Fetching {$specUrl}\n");
