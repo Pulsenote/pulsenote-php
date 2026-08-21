@@ -24,6 +24,10 @@ final class Notification
         public readonly ?string $subject = null,
         /** ID of the template used, if any. */
         public readonly ?string $templateId = null,
+        /** Human-readable name of that template, if any. */
+        public readonly ?string $templateName = null,
+        /** Sender the email was actually sent from, after the tenant default was resolved. */
+        public readonly ?string $fromAddress = null,
         /** Upstream provider (SES) message ID. */
         public readonly ?string $providerMessageId = null,
         /** When the email was handed to the provider. */
@@ -53,6 +57,8 @@ final class Notification
             updatedAt: Payload::dateTime($data, 'updatedAt'),
             subject: Payload::stringOrNull($data, 'subject'),
             templateId: Payload::stringOrNull($data, 'templateId'),
+            templateName: Payload::stringOrNull($data, 'templateName'),
+            fromAddress: Payload::stringOrNull($data, 'fromAddress'),
             providerMessageId: Payload::stringOrNull($data, 'providerMessageId'),
             sentAt: Payload::dateTimeOrNull($data, 'sentAt'),
             deliveredAt: Payload::dateTimeOrNull($data, 'deliveredAt'),

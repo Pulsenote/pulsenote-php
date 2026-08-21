@@ -6,6 +6,26 @@ All notable changes to this package are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `Notifications::sendBatch()` — `POST /api/v1/notifications/batch`, up to 500 messages
+  per call. New `BatchMessage` input object (same arguments as `send()`) and
+  `BatchSendResult` / `BatchMessageResult` / `BatchMessageStatus` for the per-message
+  outcome. The batch is partial-success: it returns `202` with rejections rather than
+  throwing, so check `rejected` / `isCompletelySuccessful()`.
+- `Notifications::list()` and `all()` accept `search` — matches recipient or subject,
+  case-insensitive.
+- `Notification` now exposes `templateName` and `fromAddress`, which the API returns but
+  the model silently dropped.
+
+### Changed
+
+- `scripts/fetch-spec.php` defaults to the public spec at `https://pulsenote.eu/openapi.json`;
+  the internal `pulsenote-api.sysgp.eu` host it used before is not reliably reachable.
+- `Notification`'s constructor gained two parameters after `$templateId`. Positional
+  construction of the model shifts accordingly; `fromArray()` and named arguments are
+  unaffected.
+
 ## [0.1.0] - 2026-07-28
 
 ### Added

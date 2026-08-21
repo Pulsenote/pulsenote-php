@@ -44,7 +44,7 @@ The client exposes three groups matching the API's data plane:
 
 | Group | Methods |
 |-------|---------|
-| `$pulsenote->notifications` | `send`, `list`, `all`, `get`, `stats` |
+| `$pulsenote->notifications` | `send`, `sendBatch`, `list`, `all`, `get`, `stats` |
 | `$pulsenote->templates` | `list`, `get`, `create`, `update`, `delete`, `render`, `listLocales` |
 | `$pulsenote->domains` | `list`, `add`, `verify`, `dnsRecords`, `zoneFile`, `delete` |
 
@@ -52,6 +52,37 @@ Everything is named arguments in, typed objects out — statuses are enums
 (`NotificationStatus`, `DomainStatus`, `DnsRecordType`), timestamps are
 `DateTimeImmutable`, and unset optional arguments are omitted from the request rather
 than sent as `null`.
+
+### Batch sending
+
+`sendBatch()` queues up to 500 emails in one request. Each message is validated
+independently, so the batch is **partial-success**: one bad recipient rejects that
+message and the rest still go out.
+
+```php
+use Pulsenote\Model\BatchMessage;
+
+$batch = $pulsenote->notifications->sendBatch([
+    new BatchMessage(to: 'a@example.com', subject: 'Welcome', html: '<b>Hi</b>'),
+    new BatchMessage(to: 'b@example.com', templateSlug: 'welcome', locale: 'pl',
+                     templateData: ['name' => 'Greg']),
+]);
+
+echo $batch->queued, '/', $batch->total, ' queued', PHP_EOL;
+
+foreach ($batch->rejections() as $failed) {
+    echo 'message ', $failed->index, ' rejected: ', $failed->error, PHP_EOL;
+}
+```
+
+`BatchMessage` takes the same arguments as `send()`. The result is iterable over the
+per-message outcomes and also gives you `queuedIds()`, `rejections()`, and
+`isCompletelySuccessful()`.
+
+> A batch that partly failed still returns `202` and **does not throw** — check
+> `$batch->rejected` (or `isCompletelySuccessful()`) rather than assuming success.
+> Exceptions are reserved for whole-request failures: bad key, quota exhausted, or a
+> batch that is empty or over `Notifications::MAX_BATCH`.
 
 ### Paginating
 
@@ -64,6 +95,12 @@ echo $page->meta->total, ' total, ', count($page), ' on this page';
 foreach ($pulsenote->notifications->all(status: NotificationStatus::Bounced) as $n) {
     echo $n->recipient, ' — ', $n->failureReason, PHP_EOL;
 }
+```
+
+Both accept `search` to filter by recipient or subject, case-insensitive:
+
+```php
+$pulsenote->notifications->list(search: 'greg@example.com');
 ```
 
 ### Errors
