@@ -67,6 +67,15 @@ final class MockHttpClient implements ClientInterface
         return $next;
     }
 
+    /**
+     * How many requests were actually attempted. Lets a test assert that nothing
+     * went out — `lastRequest()` throws in that case, which is awkward to assert on.
+     */
+    public function requestCount(): int
+    {
+        return count($this->requests);
+    }
+
     public function lastRequest(): RequestInterface
     {
         $last = end($this->requests);

@@ -214,6 +214,56 @@ notification retries on Laravel's normal path.
 
 See [`examples/laravel-notification.php`](examples/laravel-notification.php).
 
+### Mail transport — `MAIL_MAILER=pulsenote`
+
+The channel above needs a `toPulsenote()` method on every notification. The **mail
+transport** needs none: point Laravel's mailer at Pulsenote and every existing
+Mailable, password reset and verification email routes through it unchanged.
+
+Add the mailer to `config/mail.php`:
+
+```php
+'mailers' => [
+    'pulsenote' => ['transport' => 'pulsenote'],
+],
+```
+
+then switch to it:
+
+```env
+MAIL_MAILER=pulsenote
+PULSENOTE_API_KEY=pk_live_...
+```
+
+That is the whole change. `Mail::to($user)->send(new OrderShipped($order))` now goes
+through Pulsenote.
+
+#### What it will not send
+
+The API carries `to`, `from`, `subject`, `html` and `text`. It has **no `cc`, `bcc`,
+`replyTo` or attachments**, and the transport **throws** rather than dropping them:
+
+```
+Pulsenote: the mail transport cannot send cc, attachments — the API has no field
+for them. Nothing was sent, deliberately: dropping them silently would deliver a
+message that differs from the one your Mailable declares.
+```
+
+A vanished invoice PDF is a worse failure than an exception at send time, and one
+you would not discover until a customer complained. If a particular Mailable needs
+those, route it through a different mailer:
+
+```php
+Mail::mailer('ses')->to($user)->send(new InvoiceIssued($invoice));
+```
+
+#### Several recipients
+
+Pulsenote models one recipient per message, so `Mail::to(['a@x.com', 'b@x.com'])` is
+fanned out through the batch endpoint — one message each. **Recipients therefore do
+not see one another in the `To` header.** For transactional mail that is usually what
+you want; it is a behaviour change if you were relying on a shared `To`.
+
 ## Custom HTTP client
 
 Pass any PSR-18 client — useful for middleware, custom timeouts, or tests:

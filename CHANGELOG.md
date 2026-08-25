@@ -8,6 +8,15 @@ All notable changes to this package are documented here. The format follows
 
 ### Added
 
+- **Laravel mail transport** — `MAIL_MAILER=pulsenote`. Registers a `pulsenote` mail
+  driver so every existing Mailable, password reset and verification email routes
+  through the API without touching application code; the notification channel, by
+  contrast, requires a `toPulsenote()` method on each notification.
+
+  The transport **refuses** `cc`, `bcc`, `replyTo` and attachments rather than dropping
+  them, since the API has no field for any of them and a silently missing attachment is
+  a worse failure than an exception. Several `To` recipients are fanned out through the
+  batch endpoint, so they do not see one another in the header.
 - Sandbox results on `send()` / `sendBatch()`. With no verified sending domain the API
   renders the message without delivering it and returns `status: SANDBOX` with
   `sandbox: true` and an explanatory `message`, instead of raising. `SendEmailResponse`

@@ -6,6 +6,7 @@ namespace Pulsenote\Laravel;
 
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Mail\MailManager;
 use Illuminate\Notifications\ChannelManager;
 use Illuminate\Support\ServiceProvider;
 use Pulsenote\Exception\ConfigurationException;
@@ -15,7 +16,8 @@ use Pulsenote\Pulsenote;
  * Laravel integration — registered automatically by package discovery.
  *
  * Binds {@see Pulsenote} as a singleton (inject it anywhere), publishes
- * `config/pulsenote.php`, and registers the `pulsenote` notification channel.
+ * `config/pulsenote.php`, and registers both the `pulsenote` notification channel
+ * and the `pulsenote` mail transport (`MAIL_MAILER=pulsenote`).
  *
  * This class is only loaded inside a Laravel application; nothing else in the SDK
  * touches Illuminate.
@@ -60,6 +62,15 @@ final class PulsenoteServiceProvider extends ServiceProvider
         // apps that don't use the channel never pay for the manager.
         $this->app->resolving(ChannelManager::class, static function (ChannelManager $manager, Container $app): void {
             $manager->extend('pulsenote', static fn (): PulsenoteChannel => $app->make(PulsenoteChannel::class));
+        });
+
+        // Same deferral for the mail transport. Registering the driver is free; the
+        // Pulsenote client (and therefore the API-key check) is only resolved if the
+        // app actually selects this mailer.
+        $this->app->resolving(MailManager::class, static function (MailManager $manager, Container $app): void {
+            $manager->extend('pulsenote', static fn (): PulsenoteTransport => new PulsenoteTransport(
+                $app->make(Pulsenote::class),
+            ));
         });
     }
 
