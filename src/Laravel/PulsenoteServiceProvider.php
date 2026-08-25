@@ -60,8 +60,15 @@ final class PulsenoteServiceProvider extends ServiceProvider
 
         // Deferred: only resolves once something actually sends a notification, so
         // apps that don't use the channel never pay for the manager.
+        //
+        // The inner closure must NOT be static. Illuminate\Support\Manager::extend()
+        // binds the callback to the manager, and Laravel 13 turned a failed bind into
+        // a hard error ("Unable to bind custom driver callback") — a static closure
+        // cannot be bound, so the channel blew up the moment the manager resolved.
+        // MailManager::extend() below is a different class and does not bind, which is
+        // why the mail transport was unaffected.
         $this->app->resolving(ChannelManager::class, static function (ChannelManager $manager, Container $app): void {
-            $manager->extend('pulsenote', static fn (): PulsenoteChannel => $app->make(PulsenoteChannel::class));
+            $manager->extend('pulsenote', fn (): PulsenoteChannel => $app->make(PulsenoteChannel::class));
         });
 
         // Same deferral for the mail transport. Registering the driver is free; the

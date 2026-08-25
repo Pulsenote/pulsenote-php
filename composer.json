@@ -2,7 +2,13 @@
     "name": "pulsenote/pulsenote-php",
     "description": "Official PHP SDK for the Pulsenote email API.",
     "type": "library",
-    "keywords": ["pulsenote", "email", "sdk", "api-client", "notifications"],
+    "keywords": [
+        "pulsenote",
+        "email",
+        "sdk",
+        "api-client",
+        "notifications"
+    ],
     "homepage": "https://pulsenote.eu",
     "license": "MIT",
     "authors": [
@@ -25,10 +31,10 @@
     },
     "require-dev": {
         "guzzlehttp/guzzle": "^7.8",
-        "illuminate/config": "^11.0 || ^12.0",
-        "illuminate/mail": "^11.0 || ^12.0",
-        "illuminate/notifications": "^11.0 || ^12.0",
-        "illuminate/support": "^11.0 || ^12.0",
+        "illuminate/config": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/mail": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/notifications": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/support": "^11.0 || ^12.0 || ^13.0",
         "phpstan/phpstan": "^2.2",
         "phpunit/phpunit": "^10.5",
         "vlucas/phpdotenv": "^5.6.2"
@@ -51,7 +57,10 @@
     "scripts": {
         "test": "phpunit",
         "stan": "phpstan analyse --memory-limit=512M",
-        "check": ["@stan", "@test"]
+        "check": [
+            "@stan",
+            "@test"
+        ]
     },
     "config": {
         "sort-packages": true,
