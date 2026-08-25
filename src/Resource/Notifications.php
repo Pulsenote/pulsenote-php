@@ -33,6 +33,11 @@ final class Notifications extends Resource
      * `templateSlug`); the API rejects a request with neither. The call returns as
      * soon as the email is queued — it is not yet delivered.
      *
+     * With no verified sending domain the message is rendered but NOT delivered:
+     * the result carries `sandbox: true` and status `SANDBOX`. That is not an error,
+     * so check {@see \Pulsenote\Model\SendEmailResponse::$sandbox} rather than
+     * assuming a successful call means the email left the building.
+     *
      * ```php
      * $pulsenote->notifications->send(
      *     to: 'greg@example.com',
@@ -44,6 +49,7 @@ final class Notifications extends Resource
      * @param string                   $to           Recipient email address.
      * @param string|null              $subject      Subject line. Ignored when the template supplies its own.
      * @param string|null              $from         Sender on a verified domain. Defaults to the tenant default sender.
+     *                                               In sandbox it is echoed back untouched, so going live needs no code change.
      * @param string|null              $html         Raw HTML body (when not using a template).
      * @param string|null              $text         Plain-text body.
      * @param string|null              $templateId   Send using a stored template by ID.
@@ -88,7 +94,7 @@ final class Notifications extends Resource
      * Queue many emails in one request.
      *
      * Each message is validated and queued independently, so this is **partial-success**:
-     * a bad recipient or an unverified sender rejects that one message and the rest still
+     * a bad recipient rejects that one message and the rest still
      * go out. The call only throws for whole-request failures (bad API key, empty or
      * oversized batch, exhausted quota) — per-message failures come back in the result.
      *

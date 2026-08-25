@@ -34,11 +34,40 @@ $res = $pulsenote->notifications->send(
     html: '<b>Hello from Pulsenote</b>',
 );
 
-echo $res->id, ' ', $res->status->value; // "<uuid> QUEUED"
+echo $res->id, ' ', $res->status->value; // "<uuid> QUEUED"  (or SANDBOX — see below)
 ```
 
 `Pulsenote::fromEnvironment()` does the same from `PULSENOTE_API_KEY` (and optional
 `PULSENOTE_BASE_URL`).
+
+### Sandbox — your first send probably won't be delivered
+
+Pulsenote sends only from **your own** verified domain; there is no shared sending
+address. Until you have verified one, sends are accepted and fully rendered but
+**never delivered**, and come back as sandbox rather than failing:
+
+```php
+$res = $pulsenote->notifications->send(/* … */);
+
+if ($res->sandbox) {
+    // $res->status === NotificationStatus::Sandbox
+    // Rendered and stored for preview — nothing was delivered.
+    error_log($res->message);
+}
+```
+
+This exists so you can wire up the integration *before* pointing production DNS at
+an email vendor. The `from` you pass is echoed back untouched, so **going live is
+just verifying a domain — no code changes**. Sandbox is capped at 50 messages/month
+and does not consume your plan allowance.
+
+Verify a domain with `$pulsenote->domains`, or in Settings → Domains. A subdomain
+such as `notify.yourcompany.com` is recommended: its DNS records are separate from
+your main domain, so publishing them cannot affect the deliverability of your
+existing company email.
+
+> Guard against shipping in sandbox by asserting on it:
+> `self::assertFalse($res->sandbox);`
 
 The client exposes three groups matching the API's data plane:
 

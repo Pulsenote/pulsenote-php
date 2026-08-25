@@ -56,6 +56,55 @@ final class NotificationsTest extends TestCase
         self::assertSame('noreply@sysgp.eu', $res->from);
     }
 
+    /**
+     * The SpecCoverageTest guard only fails on new *operations*, so response fields
+     * can drift in unnoticed. These pin the sandbox contract.
+     *
+     * Before SANDBOX was added to the enum, this very payload made Payload::enum()
+     * throw a TransportException — a hard failure on a new user's first send, which
+     * is precisely the case sandbox exists to serve.
+     */
+    public function testSendSurfacesSandboxWhenNoDomainIsVerified(): void
+    {
+        $this->http->push(202, [
+            'id' => 'n-sbx',
+            'status' => 'SANDBOX',
+            'from' => 'noreply@not-yet-verified.com',
+            'sandbox' => true,
+            'message' => 'Sandbox mode: the email was rendered but NOT delivered…',
+        ]);
+
+        $res = $this->client()->notifications->send(
+            to: 'greg@example.com',
+            from: 'noreply@not-yet-verified.com',
+            subject: 'Welcome',
+            html: '<b>Hi</b>',
+        );
+
+        self::assertTrue($res->sandbox);
+        self::assertSame(NotificationStatus::Sandbox, $res->status);
+        self::assertStringContainsString('NOT delivered', (string) $res->message);
+        // Echoed back untouched — that is what makes going live a domain
+        // verification rather than a code change.
+        self::assertSame('noreply@not-yet-verified.com', $res->from);
+        // Nothing will move it, so it is terminal.
+        self::assertTrue($res->status->isTerminal());
+    }
+
+    public function testSendLeavesSandboxFalseOnALiveSend(): void
+    {
+        $this->http->push(202, ['id' => 'abc', 'status' => 'QUEUED', 'from' => 'noreply@sysgp.eu']);
+
+        $res = $this->client()->notifications->send(
+            to: 'greg@example.com',
+            subject: 'Welcome',
+            html: '<b>Hi</b>',
+        );
+
+        self::assertFalse($res->sandbox);
+        self::assertNull($res->message);
+    }
+
     public function testSendOmitsUnsetOptionalFields(): void
     {
         $this->http->push(202, ['id' => 'abc', 'status' => 'QUEUED', 'from' => 'noreply@sysgp.eu']);
