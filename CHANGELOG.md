@@ -8,6 +8,15 @@ All notable changes to this package are documented here. The format follows
 
 ### Added
 
+- Sandbox results on `send()` / `sendBatch()`. With no verified sending domain the API
+  renders the message without delivering it and returns `status: SANDBOX` with
+  `sandbox: true` and an explanatory `message`, instead of raising. `SendEmailResponse`
+  gains `$sandbox` and `$message`, and `NotificationStatus` gains `Sandbox` (terminal —
+  nothing will move it).
+
+  **This was a hard failure before.** `Payload::enum()` rejects unknown values, so a
+  `SANDBOX` status made `send()` throw `TransportException` — on a new user's very first
+  send, which is exactly the case sandbox exists to serve.
 - `Notifications::sendBatch()` — `POST /api/v1/notifications/batch`, up to 500 messages
   per call. New `BatchMessage` input object (same arguments as `send()`) and
   `BatchSendResult` / `BatchMessageResult` / `BatchMessageStatus` for the per-message

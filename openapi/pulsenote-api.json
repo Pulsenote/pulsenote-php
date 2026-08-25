@@ -33,7 +33,7 @@
     "paths": {
         "/api/v1/notifications/send": {
             "post": {
-                "description": "Queues an email for delivery. Returns immediately with the notification ID.",
+                "description": "Queues an email for delivery. Returns immediately with the notification ID.\n\n**Sandbox:** if your account has no verified sending domain yet, the message is rendered and stored for preview but never delivered, and the response comes back with `status: \"SANDBOX\"` and `sandbox: true`. Everything else behaves identically \u2014 including the `from` address you pass \u2014 so verifying a domain in Settings is the only change needed to start sending for real. Sandbox is capped at 50 messages/month and does not consume your plan allowance.",
                 "operationId": "sendNotification",
                 "parameters": [],
                 "requestBody": {
@@ -166,7 +166,8 @@
                                 "SENT",
                                 "DELIVERED",
                                 "FAILED",
-                                "BOUNCED"
+                                "BOUNCED",
+                                "SANDBOX"
                             ],
                             "type": "string"
                         }
@@ -756,6 +757,13 @@
                     "fromName": {
                         "type": "string",
                         "description": "Default display name for this domain."
+                    },
+                    "region": {
+                        "type": "string",
+                        "enum": [
+                            "eu-west-1"
+                        ],
+                        "description": "AWS region to host this domain\u2019s SES identity in (data residency / jurisdiction of processing). Must be a supported region; defaults to the platform region if omitted."
                     }
                 },
                 "required": [
@@ -862,6 +870,10 @@
                     "domain": {
                         "type": "string"
                     },
+                    "region": {
+                        "type": "string",
+                        "description": "AWS SES region this domain sends from (null = platform default)."
+                    },
                     "status": {
                         "enum": [
                             "PENDING",
@@ -963,7 +975,8 @@
                             "SENT",
                             "DELIVERED",
                             "FAILED",
-                            "BOUNCED"
+                            "BOUNCED",
+                            "SANDBOX"
                         ],
                         "type": "string",
                         "description": "Current delivery status."
@@ -1169,6 +1182,14 @@
                     "text": {
                         "type": "string",
                         "description": "Plain-text body."
+                    },
+                    "stream": {
+                        "type": "string",
+                        "enum": [
+                            "transactional",
+                            "broadcast"
+                        ],
+                        "description": "Message stream \u2014 transactional (default) or broadcast. Isolates reputation + suppression."
                     }
                 },
                 "required": [
@@ -1190,14 +1211,23 @@
                             "SENT",
                             "DELIVERED",
                             "FAILED",
-                            "BOUNCED"
+                            "BOUNCED",
+                            "SANDBOX"
                         ],
                         "type": "string",
-                        "description": "Status at time of acceptance (always QUEUED)."
+                        "description": "Status at time of acceptance. `QUEUED` for a normal send. `SANDBOX` when the account has no verified sending domain \u2014 the message is rendered and stored for preview but never delivered."
                     },
                     "from": {
                         "type": "string",
                         "description": "Resolved sender address the email will be sent from."
+                    },
+                    "sandbox": {
+                        "type": "boolean",
+                        "description": "Present and `true` only in sandbox mode. Check this in your integration tests to assert you are sending for real. Verify a sending domain to leave sandbox \u2014 no code changes are required."
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Human-readable explanation, returned in sandbox mode."
                     }
                 },
                 "required": [
