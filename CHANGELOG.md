@@ -4,6 +4,31 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Symfony Mailer bridge** — `PulsenoteTransportFactory` turns a
+  `pulsenote+api://KEY@default` DSN into a transport, so a Symfony application routes
+  every `MailerInterface::send()` through Pulsenote by registering one tagged service.
+  The API key is read from the DSN *user*, not the password, because Symfony redacts
+  passwords in `debug:config` but echoes hosts.
+- `PulsenoteTransport` now accepts an event dispatcher and logger. Without them Symfony
+  Mailer emits no `SentMessage` / `FailedMessage` events and logs nothing, so anything
+  built on those hooks silently stops working.
+
+### Changed
+
+- The transport moved from `Pulsenote\Laravel\PulsenoteTransport` to
+  `Pulsenote\Mailer\PulsenoteTransport`. It was never Laravel-specific — Laravel runs
+  on Symfony Mailer — and a Symfony application should not have to reference a Laravel
+  namespace.
+
+### Deprecated
+
+- `Pulsenote\Laravel\PulsenoteTransport`, kept as a subclass because it shipped in
+  1.0.0. Behaviour is identical; use `Pulsenote\Mailer\PulsenoteTransport`.
+
 ## [1.0.0] - 2026-08-25
 
 ### Added
