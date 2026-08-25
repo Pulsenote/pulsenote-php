@@ -26,6 +26,7 @@
     "require-dev": {
         "guzzlehttp/guzzle": "^7.8",
         "illuminate/config": "^11.0 || ^12.0",
+        "illuminate/mail": "^11.0 || ^12.0",
         "illuminate/notifications": "^11.0 || ^12.0",
         "illuminate/support": "^11.0 || ^12.0",
         "phpstan/phpstan": "^2.2",
