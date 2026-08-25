@@ -4,7 +4,7 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] - 2026-08-25
 
 ### Added
 
@@ -65,5 +65,6 @@ All notable changes to this package are documented here. The format follows
 - `SpecCoverageTest` — diffs the SDK against the committed OpenAPI spec so API drift
   fails CI. `make spec` refreshes the spec from the live API.
 
-[Unreleased]: https://github.com/Pulsenote/pulsenote-php/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/Pulsenote/pulsenote-php/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Pulsenote/pulsenote-php/compare/1.0.0...HEAD
+[1.0.0]: https://github.com/Pulsenote/pulsenote-php/compare/0.1.0...1.0.0
+[0.1.0]: https://github.com/Pulsenote/pulsenote-php/releases/tag/0.1.0
