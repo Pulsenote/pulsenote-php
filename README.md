@@ -264,6 +264,43 @@ fanned out through the batch endpoint — one message each. **Recipients therefo
 not see one another in the `To` header.** For transactional mail that is usually what
 you want; it is a behaviour change if you were relying on a shared `To`.
 
+## Symfony Mailer
+
+The transport is a Symfony Mailer transport — Laravel just happens to run on Symfony
+Mailer too. In a Symfony application, register the factory and point the DSN at it:
+
+```yaml
+# config/services.yaml
+services:
+    Pulsenote\Mailer\PulsenoteTransportFactory:
+        tags: ['mailer.transport_factory']
+```
+
+```env
+MAILER_DSN=pulsenote+api://YOUR_API_KEY@default
+```
+
+Every `MailerInterface::send()` in the application now goes through Pulsenote —
+Mailables, password resets, verification emails, unchanged.
+
+> **The API key is the DSN *user*, not the password.** Symfony redacts the password in
+> `debug:config` output but not the host, and a credential in a slot that gets echoed
+> back into logs is how keys leak. `@default` is a placeholder host; pass a real one
+> only to target a non-production API.
+
+Outside the framework it works standalone:
+
+```php
+$transport = (new Transport([new PulsenoteTransportFactory()]))
+    ->fromString('pulsenote+api://YOUR_API_KEY@default');
+
+(new Mailer($transport))->send($email);
+```
+
+The same limits apply as everywhere else: `cc`, `bcc`, `replyTo` and attachments are
+refused rather than dropped, and several `To` recipients are fanned out through the
+batch endpoint.
+
 ## Custom HTTP client
 
 Pass any PSR-18 client — useful for middleware, custom timeouts, or tests:

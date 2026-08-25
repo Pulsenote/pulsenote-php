@@ -7,6 +7,7 @@ namespace Pulsenote\Laravel;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Mail\MailManager;
+use Pulsenote\Mailer\PulsenoteTransport;
 use Illuminate\Notifications\ChannelManager;
 use Illuminate\Support\ServiceProvider;
 use Pulsenote\Exception\ConfigurationException;
