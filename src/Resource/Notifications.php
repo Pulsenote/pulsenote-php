@@ -7,6 +7,7 @@ namespace Pulsenote\Resource;
 use Pulsenote\Enum\NotificationStatus;
 use Pulsenote\Exception\ConfigurationException;
 use Pulsenote\Internal\Operation;
+use Pulsenote\Model\Attachment;
 use Pulsenote\Model\BatchMessage;
 use Pulsenote\Model\BatchSendResult;
 use Pulsenote\Model\Notification;
@@ -56,6 +57,10 @@ final class Notifications extends Resource
      * @param string|null              $templateSlug Send using a stored template by slug.
      * @param string|null              $locale       Locale of the template variant to use (e.g. `en`, `pl`).
      * @param array<string,mixed>|null $templateData Variables interpolated into the template.
+     * @param list<string>|null        $cc           Carbon-copy recipients, visible to everyone on the message.
+     * @param list<string>|null        $bcc          Blind-carbon-copy recipients, hidden from the others.
+     * @param list<string>|null        $replyTo      Where replies go, when that differs from `from`. These need no verified domain.
+     * @param list<Attachment>|null    $attachments  Files to attach — see {@see Attachment::fromPath()}.
      *
      * @throws \Pulsenote\Exception\ValidationException The payload was rejected (bad address, no body, unverified sender).
      * @throws \Pulsenote\Exception\RateLimitException  The tenant's send quota is exhausted.
@@ -72,6 +77,12 @@ final class Notifications extends Resource
         ?string $templateSlug = null,
         ?string $locale = null,
         ?array $templateData = null,
+        // Appended rather than grouped with the other addressing arguments so that
+        // existing positional calls keep their meaning. Prefer named arguments.
+        ?array $cc = null,
+        ?array $bcc = null,
+        ?array $replyTo = null,
+        ?array $attachments = null,
     ): SendEmailResponse {
         return SendEmailResponse::fromArray($this->transport->requestObject(
             'POST',
@@ -82,11 +93,34 @@ final class Notifications extends Resource
                 'from' => $from,
                 'html' => $html,
                 'text' => $text,
+                'cc' => $cc,
+                'bcc' => $bcc,
+                'replyTo' => $replyTo,
+                'attachments' => self::attachmentsToPayload($attachments),
                 'templateId' => $templateId,
                 'templateSlug' => $templateSlug,
                 'locale' => $locale,
                 'templateData' => $templateData,
             ],
+        ));
+    }
+
+    /**
+     * @param list<Attachment>|null $attachments
+     *
+     * @return list<array<string,mixed>>|null
+     *
+     * @internal
+     */
+    public static function attachmentsToPayload(?array $attachments): ?array
+    {
+        if ($attachments === null || $attachments === []) {
+            return null;
+        }
+
+        return array_values(array_map(
+            static fn (Attachment $attachment): array => $attachment->toPayload(),
+            $attachments,
         ));
     }
 

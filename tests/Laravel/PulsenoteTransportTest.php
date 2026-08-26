@@ -81,41 +81,107 @@ final class PulsenoteTransportTest extends TestCase
         self::assertSame('b@example.com', $body['messages'][1]['to']);
     }
 
-    /**
-     * Silent divergence between what a Mailable declares and what the recipient gets
-     * is the failure mode worth being loud about — a dropped invoice PDF surfaces as
-     * a customer complaint weeks later, not as a stack trace.
-     *
-     * @return iterable<string,array{callable(Email):Email,string}>
-     */
-    public static function unsupportedFeatures(): iterable
+    public function testForwardsCopiesAndReplyTo(): void
     {
-        yield 'cc' => [static fn (Email $e): Email => $e->cc('cc@example.com'), 'cc'];
-        yield 'bcc' => [static fn (Email $e): Email => $e->bcc('bcc@example.com'), 'bcc'];
-        yield 'replyTo' => [static fn (Email $e): Email => $e->replyTo('reply@example.com'), 'replyTo'];
-        yield 'attachment' => [
-            static fn (Email $e): Email => $e->attach('invoice bytes', 'invoice.pdf'),
-            'attachments',
-        ];
+        $this->http->push(202, ['id' => 'n1', 'status' => 'QUEUED', 'from' => 'app@example.com']);
+
+        $this->transport()->send(
+            $this->email()
+                ->cc('cc@example.com')
+                ->bcc('bcc@example.com')
+                ->replyTo('reply@example.com'),
+        );
+
+        $body = $this->http->lastBody();
+        self::assertSame(['cc@example.com'], $body['cc']);
+        self::assertSame(['bcc@example.com'], $body['bcc']);
+        self::assertSame(['reply@example.com'], $body['replyTo']);
     }
 
     /**
-     * @param callable(Email):Email $mutate
+     * The case that made this transport unusable for real applications: a Mailable
+     * with an invoice attached. It must arrive, base64-encoded, not be refused.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('unsupportedFeatures')]
-    public function testRefusesWhatTheApiCannotRepresent(callable $mutate, string $expected): void
+    public function testForwardsAnAttachment(): void
     {
-        $email = $mutate($this->email());
+        $this->http->push(202, ['id' => 'n1', 'status' => 'QUEUED', 'from' => 'app@example.com']);
 
-        try {
-            $this->transport()->send($email);
-            self::fail('Expected the transport to refuse ' . $expected);
-        } catch (TransportException $e) {
-            self::assertStringContainsString($expected, $e->getMessage());
+        $this->transport()->send(
+            $this->email()->attach('invoice bytes', 'invoice.pdf', 'application/pdf'),
+        );
+
+        $body = $this->http->lastBody();
+        self::assertCount(1, $body['attachments']);
+        self::assertSame('invoice.pdf', $body['attachments'][0]['filename']);
+        self::assertSame('application/pdf', $body['attachments'][0]['contentType']);
+        self::assertSame('invoice bytes', base64_decode($body['attachments'][0]['content'], true));
+        // Not embedded, so no content id — it is a download, not an inline image.
+        self::assertArrayNotHasKey('contentId', $body['attachments'][0]);
+    }
+
+    public function testMarksAnEmbeddedFileWithItsContentId(): void
+    {
+        $this->http->push(202, ['id' => 'n1', 'status' => 'QUEUED', 'from' => 'app@example.com']);
+
+        $this->transport()->send(
+            $this->email()->embed('png bytes', 'logo', 'image/png'),
+        );
+
+        $body = $this->http->lastBody();
+        self::assertSame('logo', $body['attachments'][0]['filename']);
+        self::assertNotEmpty($body['attachments'][0]['contentId'] ?? null);
+    }
+
+    public function testOmitsCopyFieldsWhenThereAreNone(): void
+    {
+        $this->http->push(202, ['id' => 'n1', 'status' => 'QUEUED', 'from' => 'app@example.com']);
+
+        $this->transport()->send($this->email());
+
+        $body = $this->http->lastBody();
+        self::assertArrayNotHasKey('cc', $body);
+        self::assertArrayNotHasKey('bcc', $body);
+        self::assertArrayNotHasKey('replyTo', $body);
+        self::assertArrayNotHasKey('attachments', $body);
+    }
+
+    /**
+     * Several `To` recipients fan out to one message each, so copies must not ride
+     * along on every one — a cc'd address would otherwise receive N copies of the
+     * same mail. Attachments and replyTo do belong on all of them.
+     */
+    public function testSendsCopiesOnceWhenFanningOutToSeveralRecipients(): void
+    {
+        $this->http->push(202, [
+            'total' => 2,
+            'queued' => 2,
+            'rejected' => 0,
+            'results' => [
+                ['index' => 0, 'status' => 'queued', 'id' => 'a'],
+                ['index' => 1, 'status' => 'queued', 'id' => 'b'],
+            ],
+        ]);
+
+        $this->transport()->send(
+            $this->email()
+                ->to('a@example.com', 'b@example.com')
+                ->cc('cc@example.com')
+                ->bcc('bcc@example.com')
+                ->replyTo('reply@example.com')
+                ->attach('invoice bytes', 'invoice.pdf', 'application/pdf'),
+        );
+
+        $messages = $this->http->lastBody()['messages'];
+
+        self::assertSame(['cc@example.com'], $messages[0]['cc']);
+        self::assertSame(['bcc@example.com'], $messages[0]['bcc']);
+        self::assertArrayNotHasKey('cc', $messages[1]);
+        self::assertArrayNotHasKey('bcc', $messages[1]);
+
+        foreach ($messages as $message) {
+            self::assertSame(['reply@example.com'], $message['replyTo']);
+            self::assertSame('invoice.pdf', $message['attachments'][0]['filename']);
         }
-
-        // Nothing may go out — a partial send would be worse than none.
-        self::assertSame(0, $this->http->requestCount());
     }
 
     /**
