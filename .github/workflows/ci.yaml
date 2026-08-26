@@ -2,9 +2,9 @@ name: CI
 
 # RUNNERS: defaults to GitHub-hosted `ubuntu-latest`, and moves to the self-hosted
 # k3s ARC runners when the repo Variable RUNNER_LABEL is set (Settings → Secrets and
-# variables → Actions → Variables) — same convention as the `microservices` repo.
+# variables → Actions → Variables) — same convention as the `pulsenote` app repo.
 #
-# Unlike microservices, nothing here is hardcoded to `ubuntu-latest`: that repo pins
+# Unlike the app repo, nothing here is hardcoded to `ubuntu-latest`: that repo pins
 # its image builds to amd64 because the cluster nodes are amd64, but this package
 # builds no images. It is pure PHP with no native extensions, so arm64 is equivalent.
 #
