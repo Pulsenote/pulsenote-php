@@ -1,0 +1,65 @@
+name: release-please
+
+# Automates the release itself. Merging to main does NOT publish — release-please
+# opens a "Release PR" that bumps the version and CHANGELOG; merging THAT PR cuts
+# the tag and the GitHub Release, and Packagist picks the tag up via its webhook.
+#
+# The point is to remove the step that keeps getting forgotten: main having a fix
+# in it is not the same as users being able to install it.
+#
+# Versions live in two places and both are kept in sync automatically:
+#   - src/Pulsenote.php  VERSION const (used at runtime in the User-Agent),
+#     bumped through `extra-files` + the x-release-please-version annotation
+#   - version.txt, which is release-please's own bookkeeping for release-type
+#     `simple`
+#
+# ⚠️ A Release created with GITHUB_TOKEN does NOT emit a `release:` event, so it
+# cannot trigger the verify workflow on its own — a documented GitHub behaviour
+# that already bit this org once. The `verify` job below dispatches release.yaml
+# explicitly, pinned to the tag release-please just created.
+#
+# ⚠️ release-please needs to open PRs. If the org disallows "GitHub Actions
+# creating PRs", set a repo secret RELEASE_PLEASE_TOKEN (PAT or GitHub App token
+# with contents:write + pull-requests:write) — it is picked up automatically.
+
+"on":
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    outputs:
+      released: ${{ steps.rp.outputs.releases_created }}
+      tag: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: rp
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  verify:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.released == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      # Packagist publishes straight off the tag, so this cannot gate the
+      # release — it reports whether the tag that just went public is sound.
+      # Pinned to the tag, not to main, which can move in between.
+      - name: Verify ${{ needs.release-please.outputs.tag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release-please.outputs.tag }}
+        run: gh workflow run release.yaml --repo "$GITHUB_REPOSITORY" --ref "$TAG"
