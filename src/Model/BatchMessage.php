@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Pulsenote\Model;
 
+use Pulsenote\Resource\Notifications;
+
 /**
  * One message in a batch send.
  *
@@ -27,6 +29,10 @@ final class BatchMessage
      * @param string|null              $templateSlug Send using a stored template by slug.
      * @param string|null              $locale       Locale of the template variant to use (e.g. `en`, `pl`).
      * @param array<string,mixed>|null $templateData Variables interpolated into the template.
+     * @param list<string>|null        $cc           Carbon-copy recipients, visible to everyone on the message.
+     * @param list<string>|null        $bcc          Blind-carbon-copy recipients, hidden from the others.
+     * @param list<string>|null        $replyTo      Where replies go, when that differs from `from`.
+     * @param list<Attachment>|null    $attachments  Files to attach — see {@see Attachment::fromPath()}.
      */
     public function __construct(
         public readonly string $to,
@@ -38,6 +44,12 @@ final class BatchMessage
         public readonly ?string $templateSlug = null,
         public readonly ?string $locale = null,
         public readonly ?array $templateData = null,
+        // Appended rather than grouped with the other addressing arguments so that
+        // existing positional calls keep their meaning. Prefer named arguments.
+        public readonly ?array $cc = null,
+        public readonly ?array $bcc = null,
+        public readonly ?array $replyTo = null,
+        public readonly ?array $attachments = null,
     ) {
     }
 
@@ -59,6 +71,10 @@ final class BatchMessage
             'from' => $this->from,
             'html' => $this->html,
             'text' => $this->text,
+            'cc' => $this->cc,
+            'bcc' => $this->bcc,
+            'replyTo' => $this->replyTo,
+            'attachments' => Notifications::attachmentsToPayload($this->attachments),
             'templateId' => $this->templateId,
             'templateSlug' => $this->templateSlug,
             'locale' => $this->locale,

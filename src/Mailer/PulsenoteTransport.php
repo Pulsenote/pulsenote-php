@@ -6,6 +6,7 @@ namespace Pulsenote\Mailer;
 
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
+use Pulsenote\Model\Attachment;
 use Pulsenote\Model\BatchMessage;
 use Pulsenote\Pulsenote;
 use Symfony\Component\Mailer\Exception\TransportException;
@@ -25,15 +26,6 @@ use Symfony\Component\Mime\MessageConverter;
  * code" and "change one setting": existing mail, password resets and verification
  * emails route through Pulsenote untouched.
  *
- * ## What it deliberately refuses
- *
- * The API accepts `to`, `from`, `subject`, `html`, `text` and template fields —
- * there is no `cc`, `bcc`, `replyTo` or attachment support. Rather than drop those
- * silently, this transport throws. A vanished invoice PDF is a far worse failure
- * than an exception at send time, and silent divergence between what a Mailable
- * declares and what the recipient receives is the kind of bug nobody finds until a
- * customer complains.
- *
  * ## Multiple recipients
  *
  * Pulsenote models one recipient per message, so an email addressed to several
@@ -41,6 +33,12 @@ use Symfony\Component\Mime\MessageConverter;
  * — one message each. Recipients therefore do NOT see one another in the `To`
  * header. For transactional mail that is usually preferable; if you were relying on
  * a shared `To`, this is a behaviour change worth knowing about.
+ *
+ * That fan-out shapes how copies are handled: `cc` and `bcc` ride along with the
+ * FIRST message only. Repeating them on every message would deliver one copy per
+ * `To` recipient, so a two-recipient mail would hit each cc'd address twice.
+ * Attachments and `replyTo`, by contrast, belong on every message — each recipient
+ * should receive the invoice, and each should be able to reply.
  */
 class PulsenoteTransport extends AbstractTransport
 {
@@ -76,8 +74,6 @@ class PulsenoteTransport extends AbstractTransport
 
         $email = MessageConverter::toEmail($original);
 
-        $this->rejectUnsupported($email);
-
         $recipients = array_values(array_map(
             static fn (Address $address): string => $address->getAddress(),
             $email->getTo(),
@@ -92,6 +88,11 @@ class PulsenoteTransport extends AbstractTransport
         $html = $this->bodyAsString($email->getHtmlBody());
         $text = $this->bodyAsString($email->getTextBody());
 
+        $cc = $this->addressList($email->getCc());
+        $bcc = $this->addressList($email->getBcc());
+        $replyTo = $this->addressList($email->getReplyTo());
+        $attachments = $this->convertAttachments($email);
+
         if (count($recipients) === 1) {
             $this->pulsenote->notifications->send(
                 to: $recipients[0],
@@ -99,55 +100,94 @@ class PulsenoteTransport extends AbstractTransport
                 from: $from?->toString(),
                 html: $html,
                 text: $text,
+                cc: $cc,
+                bcc: $bcc,
+                replyTo: $replyTo,
+                attachments: $attachments,
             );
 
             return;
         }
 
-        $this->pulsenote->notifications->sendBatch(array_values(array_map(
-            static fn (string $to): BatchMessage => new BatchMessage(
+        $messages = [];
+
+        foreach ($recipients as $index => $to) {
+            // Copies go out once, with the first message — see the class docblock.
+            $isFirst = $index === 0;
+
+            $messages[] = new BatchMessage(
                 to: $to,
                 subject: $subject,
                 from: $from?->toString(),
                 html: $html,
                 text: $text,
-            ),
-            $recipients,
-        )));
+                cc: $isFirst ? $cc : null,
+                bcc: $isFirst ? $bcc : null,
+                replyTo: $replyTo,
+                attachments: $attachments,
+            );
+        }
+
+        $this->pulsenote->notifications->sendBatch($messages);
     }
 
     /**
-     * Fail loudly on anything the API cannot represent.
+     * @param array<Address> $addresses
+     *
+     * @return list<string>|null Null rather than an empty list, so the field is pruned from the request.
      */
-    private function rejectUnsupported(Email $email): void
+    private function addressList(array $addresses): ?array
     {
-        $unsupported = [];
-
-        if ($email->getCc() !== []) {
-            $unsupported[] = 'cc';
-        }
-        if ($email->getBcc() !== []) {
-            $unsupported[] = 'bcc';
-        }
-        if ($email->getReplyTo() !== []) {
-            $unsupported[] = 'replyTo';
-        }
-        if ($email->getAttachments() !== []) {
-            $unsupported[] = 'attachments';
+        if ($addresses === []) {
+            return null;
         }
 
-        if ($unsupported === []) {
-            return;
-        }
-
-        throw new TransportException(sprintf(
-            'Pulsenote: the mail transport cannot send %s — the API has no field for %s. '
-            . 'Nothing was sent, deliberately: dropping them silently would deliver a message '
-            . 'that differs from the one you composed. Remove them, or route this message '
-            . 'through a different mailer.',
-            implode(', ', $unsupported),
-            count($unsupported) === 1 ? 'it' : 'them',
+        return array_values(array_map(
+            static fn (Address $address): string => $address->getAddress(),
+            $addresses,
         ));
+    }
+
+    /**
+     * Convert Symfony's MIME parts into Pulsenote attachments.
+     *
+     * Whether a part is a download or an inline image is carried by its
+     * disposition, not by a content id: {@see Email::embed()} marks the part inline
+     * but assigns no cid, leaving Symfony to match `cid:<name>` in the HTML against
+     * the part's file name at render time. Since we hand the API a body Symfony
+     * will never render, that name has to become the content id here — otherwise
+     * an embedded logo arrives as an attachment and the `<img>` renders broken.
+     *
+     * @return list<Attachment>|null
+     */
+    private function convertAttachments(Email $email): ?array
+    {
+        $parts = $email->getAttachments();
+
+        if ($parts === []) {
+            return null;
+        }
+
+        $attachments = [];
+
+        foreach ($parts as $part) {
+            $filename = $part->getFilename() ?? 'attachment';
+            $isInline = $part->getDisposition() === 'inline';
+
+            $contentId = null;
+            if ($isInline) {
+                $contentId = $part->hasContentId() ? $part->getContentId() : $filename;
+            }
+
+            $attachments[] = Attachment::fromContents(
+                filename: $filename,
+                contents: $part->getBody(),
+                contentType: $part->getMediaType() . '/' . $part->getMediaSubtype(),
+                contentId: $contentId,
+            );
+        }
+
+        return $attachments;
     }
 
     /**

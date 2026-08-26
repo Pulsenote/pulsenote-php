@@ -238,24 +238,30 @@ PULSENOTE_API_KEY=pk_live_...
 That is the whole change. `Mail::to($user)->send(new OrderShipped($order))` now goes
 through Pulsenote.
 
-#### What it will not send
+#### Copies and attachments
 
-The API carries `to`, `from`, `subject`, `html` and `text`. It has **no `cc`, `bcc`,
-`replyTo` or attachments**, and the transport **throws** rather than dropping them:
-
-```
-Pulsenote: the mail transport cannot send cc, attachments — the API has no field
-for them. Nothing was sent, deliberately: dropping them silently would deliver a
-message that differs from the one your Mailable declares.
-```
-
-A vanished invoice PDF is a worse failure than an exception at send time, and one
-you would not discover until a customer complained. If a particular Mailable needs
-those, route it through a different mailer:
+A Mailable that declares `cc`, `bcc`, `replyTo` or attachments goes through unchanged
+— including the common case of an invoice PDF:
 
 ```php
-Mail::mailer('ses')->to($user)->send(new InvoiceIssued($invoice));
+class InvoiceIssued extends Mailable
+{
+    public function build(): self
+    {
+        return $this->subject('Your invoice')
+            ->cc('accounts@acme.com')
+            ->replyTo('support@acme.com')
+            ->attach(storage_path('invoices/2026-08.pdf'))
+            ->view('mail.invoice');
+    }
+}
 ```
+
+Embedded images (`$message->embed(...)`) arrive inline, so `<img src="cid:...">`
+renders as it should.
+
+Limits: 20 attachments and 10 MB per message, and 50 recipients across `to`, `cc`
+and `bcc`.
 
 #### Several recipients
 
@@ -263,6 +269,10 @@ Pulsenote models one recipient per message, so `Mail::to(['a@x.com', 'b@x.com'])
 fanned out through the batch endpoint — one message each. **Recipients therefore do
 not see one another in the `To` header.** For transactional mail that is usually what
 you want; it is a behaviour change if you were relying on a shared `To`.
+
+That fan-out decides how copies travel: `cc` and `bcc` ride on the **first** message
+only, so a cc'd address receives one copy rather than one per recipient. `replyTo`
+and attachments go on every message.
 
 ## Symfony Mailer
 
