@@ -12,6 +12,7 @@ use Psr\Http\Message\StreamFactoryInterface;
 use Pulsenote\Exception\ConfigurationException;
 use Pulsenote\Http\Transport;
 use Pulsenote\Resource\Domains;
+use Pulsenote\Resource\Suppressions;
 use Pulsenote\Resource\Notifications;
 use Pulsenote\Resource\Templates;
 
@@ -54,6 +55,9 @@ final class Pulsenote
     /** Sender domains and their DNS verification. */
     public readonly Domains $domains;
 
+    /** Addresses this tenant will not send to. */
+    public readonly Suppressions $suppressions;
+
     /**
      * @param string                        $apiKey         Tenant API key (`pk_live_…` / `pk_test_…`), sent as `X-API-Key`.
      * @param string|null                   $baseUrl        Override the API base URL. Defaults to {@see DEFAULT_BASE_URL}.
@@ -88,6 +92,7 @@ final class Pulsenote
         $this->notifications = new Notifications($transport);
         $this->templates = new Templates($transport);
         $this->domains = new Domains($transport);
+        $this->suppressions = new Suppressions($transport);
     }
 
     /**

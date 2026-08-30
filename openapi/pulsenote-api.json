@@ -1,1323 +1,1610 @@
 {
-    "openapi": "3.0.0",
-    "info": {
-        "title": "Pulsenote API",
-        "description": "Send transactional emails at scale. Authenticate every request with your API key in the `X-API-Key` header. Find your key in the Pulsenote dashboard under Settings \u2192 API Keys.",
-        "version": "1.0",
-        "contact": {}
-    },
-    "servers": [
-        {
-            "url": "https://api.pulsenote.eu",
-            "description": "Production"
-        },
-        {
-            "url": "https://pulsenote-api.sysgp.eu",
-            "description": "Staging"
-        }
-    ],
-    "tags": [
-        {
-            "name": "Notifications",
-            "description": "Send emails, check delivery status, and view statistics."
-        },
-        {
-            "name": "Templates",
-            "description": "Create and manage reusable email templates with variable interpolation."
-        },
-        {
-            "name": "Domains",
-            "description": "Register sender domains and verify them via DNS."
-        }
-    ],
-    "paths": {
-        "/api/v1/notifications/send": {
-            "post": {
-                "description": "Queues an email for delivery. Returns immediately with the notification ID.\n\n**Sandbox:** if your account has no verified sending domain yet, the message is rendered and stored for preview but never delivered, and the response comes back with `status: \"SANDBOX\"` and `sandbox: true`. Everything else behaves identically \u2014 including the `from` address you pass \u2014 so verifying a domain in Settings is the only change needed to start sending for real. Sandbox is capped at 50 messages/month and does not consume your plan allowance.",
-                "operationId": "sendNotification",
-                "parameters": [],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/SendEmailDto"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "202": {
-                        "description": "Notification queued successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/SendEmailResponseDto"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid API key"
-                    },
-                    "429": {
-                        "description": "Rate limit exceeded"
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Send an email notification",
-                "tags": [
-                    "Notifications"
-                ]
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/notifications/send": {
+      "post": {
+        "description": "Queues an email for delivery. Returns immediately with the notification ID.\n\n**Sandbox:** if your account has no verified sending domain yet, the message is rendered and stored for preview but never delivered, and the response comes back with `status: \"SANDBOX\"` and `sandbox: true`. Everything else behaves identically — including the `from` address you pass — so verifying a domain in Settings is the only change needed to start sending for real. Sandbox is capped at 50 messages/month and does not consume your plan allowance.",
+        "operationId": "sendNotification",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendEmailDto"
+              }
             }
+          }
         },
-        "/api/v1/notifications/batch": {
-            "post": {
-                "description": "Queues up to 500 emails in one call. Each message is validated independently; the response reports per-message queued/rejected status.",
-                "operationId": "sendNotificationBatch",
-                "parameters": [],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/BatchSendDto"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "202": {
-                        "description": "Batch processed (see per-message results)"
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Send a batch of email notifications",
-                "tags": [
-                    "Notifications"
-                ]
-            }
-        },
-        "/api/v1/notifications/stats": {
-            "get": {
-                "description": "Returns total counts by status, daily breakdown for last 30 days, and this month total.",
-                "operationId": "getNotificationStats",
-                "parameters": [],
-                "responses": {
-                    "200": {
-                        "description": "Aggregate statistics",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/NotificationStatsDto"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Get notification statistics",
-                "tags": [
-                    "Notifications"
-                ]
-            }
-        },
-        "/api/v1/notifications": {
-            "get": {
-                "description": "Paginated list of sent notifications for this tenant.",
-                "operationId": "listNotifications",
-                "parameters": [
-                    {
-                        "name": "page",
-                        "required": false,
-                        "in": "query",
-                        "schema": {
-                            "type": "number"
-                        }
-                    },
-                    {
-                        "name": "limit",
-                        "required": false,
-                        "in": "query",
-                        "schema": {
-                            "type": "number"
-                        }
-                    },
-                    {
-                        "name": "status",
-                        "required": false,
-                        "in": "query",
-                        "schema": {
-                            "enum": [
-                                "PENDING",
-                                "QUEUED",
-                                "SENT",
-                                "DELIVERED",
-                                "FAILED",
-                                "BOUNCED",
-                                "SANDBOX"
-                            ],
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "search",
-                        "required": false,
-                        "in": "query",
-                        "description": "Match recipient or subject (case-insensitive).",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Paginated notifications",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/NotificationListDto"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "List notifications",
-                "tags": [
-                    "Notifications"
-                ]
-            }
-        },
-        "/api/v1/notifications/{id}": {
-            "get": {
-                "description": "Returns full details of a single notification including delivery status.",
-                "operationId": "getNotification",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "required": true,
-                        "in": "path",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Notification detail",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/NotificationDto"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Notification not found"
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Get notification by ID",
-                "tags": [
-                    "Notifications"
-                ]
-            }
-        },
-        "/api/v1/templates": {
-            "get": {
-                "description": "Returns all templates. Optionally filter by locale.",
-                "operationId": "listTemplates",
-                "parameters": [
-                    {
-                        "name": "locale",
-                        "required": false,
-                        "in": "query",
-                        "description": "Filter by locale (e.g. en, pl)",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Templates",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/TemplateDto"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "List templates",
-                "tags": [
-                    "Templates"
-                ]
-            },
-            "post": {
-                "description": "Create a new template. Set locale to create a translated version.",
-                "operationId": "createTemplate",
-                "parameters": [],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/UpsertTemplateDto"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/TemplateDto"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Create template",
-                "tags": [
-                    "Templates"
-                ]
-            }
-        },
-        "/api/v1/templates/slug/{slug}/locales": {
-            "get": {
-                "description": "Returns all locale versions of a template by slug.",
-                "operationId": "listTemplateLocales",
-                "parameters": [
-                    {
-                        "name": "slug",
-                        "required": true,
-                        "in": "path",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Locale variants",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/TemplateDto"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "List all locale variants",
-                "tags": [
-                    "Templates"
-                ]
-            }
-        },
-        "/api/v1/templates/{id}": {
-            "get": {
-                "operationId": "getTemplate",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "required": true,
-                        "in": "path",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Template",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/TemplateDto"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Template not found"
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Get template by ID",
-                "tags": [
-                    "Templates"
-                ]
-            },
-            "put": {
-                "operationId": "updateTemplate",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "required": true,
-                        "in": "path",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/UpsertTemplateDto"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Updated",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/TemplateDto"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Update template",
-                "tags": [
-                    "Templates"
-                ]
-            },
-            "delete": {
-                "operationId": "deleteTemplate",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "required": true,
-                        "in": "path",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Deleted"
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Delete template",
-                "tags": [
-                    "Templates"
-                ]
-            }
-        },
-        "/api/v1/templates/{id}/render": {
-            "post": {
-                "description": "Render template with sample data for preview.",
-                "operationId": "renderTemplate",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "required": true,
-                        "in": "path",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/RenderTemplateDto"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Rendered output",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/RenderedTemplateDto"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Preview template",
-                "tags": [
-                    "Templates"
-                ]
-            }
-        },
-        "/api/v1/domains": {
-            "get": {
-                "operationId": "listDomains",
-                "parameters": [],
-                "responses": {
-                    "200": {
-                        "description": "Domains",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/DomainDto"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "List sender domains",
-                "tags": [
-                    "Domains"
-                ]
-            },
-            "post": {
-                "description": "Registers the domain with SES and returns the DNS records to publish.",
-                "operationId": "addDomain",
-                "parameters": [],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AddDomainDto"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Domain registered",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/DomainDto"
-                                }
-                            }
-                        }
-                    },
-                    "409": {
-                        "description": "Domain already registered"
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Add a sender domain",
-                "tags": [
-                    "Domains"
-                ]
-            }
-        },
-        "/api/v1/domains/{id}/dns-records": {
-            "get": {
-                "description": "Returns the DNS records to publish and per-record verification state.",
-                "operationId": "getDomainDnsRecords",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "required": true,
-                        "in": "path",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "DNS records",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/DomainDnsRecordsDto"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Domain not found"
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Get DNS records",
-                "tags": [
-                    "Domains"
-                ]
-            }
-        },
-        "/api/v1/domains/{id}/zone-file": {
-            "get": {
-                "description": "Returns a ready-to-import BIND zone file with all required DNS records.",
-                "operationId": "getDomainZoneFile",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "required": true,
-                        "in": "path",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Zone file (text/plain attachment)"
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Download BIND zone file",
-                "tags": [
-                    "Domains"
-                ]
-            }
-        },
-        "/api/v1/domains/{id}/verify": {
-            "post": {
-                "description": "Re-checks SES + DNS state and updates the domain status.",
-                "operationId": "verifyDomain",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "required": true,
-                        "in": "path",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Verification result",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/DomainDto"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Domain not found"
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Trigger domain verification",
-                "tags": [
-                    "Domains"
-                ]
-            }
-        },
-        "/api/v1/domains/{id}": {
-            "delete": {
-                "description": "Removes the domain from SES and Pulsenote.",
-                "operationId": "deleteDomain",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "required": true,
-                        "in": "path",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Deleted"
-                    },
-                    "404": {
-                        "description": "Domain not found"
-                    }
-                },
-                "security": [
-                    {
-                        "api-key": []
-                    }
-                ],
-                "summary": "Delete a sender domain",
-                "tags": [
-                    "Domains"
-                ]
-            }
-        }
-    },
-    "components": {
-        "securitySchemes": {
-            "api-key": {
-                "type": "apiKey",
-                "in": "header",
-                "name": "X-API-Key",
-                "description": "Your tenant API key. Find it in the dashboard under Settings \u2192 API Keys."
-            }
-        },
-        "schemas": {
-            "AddDomainDto": {
-                "type": "object",
-                "properties": {
-                    "domain": {
-                        "type": "string",
-                        "description": "Domain to send from, e.g. mail.example.com."
-                    },
-                    "fromEmail": {
-                        "type": "string",
-                        "format": "email",
-                        "description": "Default from address for this domain. Defaults to noreply@<domain>."
-                    },
-                    "fromName": {
-                        "type": "string",
-                        "description": "Default display name for this domain."
-                    },
-                    "region": {
-                        "type": "string",
-                        "enum": [
-                            "eu-west-1"
-                        ],
-                        "description": "AWS region to host this domain\u2019s SES identity in (data residency / jurisdiction of processing). Must be a supported region; defaults to the platform region if omitted."
-                    }
-                },
-                "required": [
-                    "domain"
-                ]
-            },
-            "BatchSendDto": {
-                "type": "object",
-                "properties": {
-                    "messages": {
-                        "description": "Up to 500 messages to queue in one call.",
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/SendEmailDto"
-                        }
-                    }
-                },
-                "required": [
-                    "messages"
-                ]
-            },
-            "DnsRecordDto": {
-                "type": "object",
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "enum": [
-                            "CNAME",
-                            "MX",
-                            "TXT"
-                        ]
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Record name/host."
-                    },
-                    "value": {
-                        "type": "string",
-                        "description": "Record value."
-                    },
-                    "purpose": {
-                        "type": "string",
-                        "description": "What this record is for."
-                    },
-                    "priority": {
-                        "type": "number",
-                        "description": "Priority (MX records only)."
-                    }
-                },
-                "required": [
-                    "type",
-                    "name",
-                    "value",
-                    "purpose"
-                ]
-            },
-            "DomainDnsRecordsDto": {
-                "type": "object",
-                "properties": {
-                    "domain": {
-                        "type": "string"
-                    },
-                    "status": {
-                        "enum": [
-                            "PENDING",
-                            "VERIFYING",
-                            "VERIFIED",
-                            "FAILED"
-                        ],
-                        "type": "string"
-                    },
-                    "records": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/DnsRecordDto"
-                        }
-                    },
-                    "spfVerified": {
-                        "type": "boolean"
-                    },
-                    "dkimVerified": {
-                        "type": "boolean"
-                    },
-                    "dmarcVerified": {
-                        "type": "boolean"
-                    }
-                },
-                "required": [
-                    "domain",
-                    "status",
-                    "records",
-                    "spfVerified",
-                    "dkimVerified",
-                    "dmarcVerified"
-                ]
-            },
-            "DomainDto": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "format": "uuid"
-                    },
-                    "domain": {
-                        "type": "string"
-                    },
-                    "region": {
-                        "type": "string",
-                        "description": "AWS SES region this domain sends from (null = platform default)."
-                    },
-                    "status": {
-                        "enum": [
-                            "PENDING",
-                            "VERIFYING",
-                            "VERIFIED",
-                            "FAILED"
-                        ],
-                        "type": "string",
-                        "description": "Verification status."
-                    },
-                    "spfVerified": {
-                        "type": "boolean",
-                        "description": "Whether the SPF (MAIL FROM) record is verified."
-                    },
-                    "dkimVerified": {
-                        "type": "boolean",
-                        "description": "Whether DKIM signing is verified."
-                    },
-                    "dmarcVerified": {
-                        "type": "boolean",
-                        "description": "Whether a DMARC policy is present."
-                    },
-                    "fromEmail": {
-                        "type": "string",
-                        "description": "Default from address for this domain."
-                    },
-                    "fromName": {
-                        "type": "string",
-                        "description": "Default display name."
-                    },
-                    "isDefault": {
-                        "type": "boolean",
-                        "description": "Whether this is the tenant default sender domain."
-                    },
-                    "verifiedAt": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "createdAt": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "updatedAt": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "dnsRecords": {
-                        "description": "DNS records to publish (returned on add/verify).",
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/DnsRecordDto"
-                        }
-                    }
-                },
-                "required": [
-                    "id",
-                    "domain",
-                    "status",
-                    "spfVerified",
-                    "dkimVerified",
-                    "dmarcVerified",
-                    "isDefault",
-                    "createdAt",
-                    "updatedAt"
-                ]
-            },
-            "NotificationDto": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "format": "uuid"
-                    },
-                    "recipient": {
-                        "type": "string",
-                        "description": "Recipient email address."
-                    },
-                    "subject": {
-                        "type": "string",
-                        "description": "Email subject line."
-                    },
-                    "templateId": {
-                        "type": "string",
-                        "description": "ID of the template used, if any.",
-                        "format": "uuid"
-                    },
-                    "templateName": {
-                        "type": "string",
-                        "description": "Name of the template used, if any."
-                    },
-                    "fromAddress": {
-                        "type": "string",
-                        "description": "Sender email address."
-                    },
-                    "status": {
-                        "enum": [
-                            "PENDING",
-                            "QUEUED",
-                            "SENT",
-                            "DELIVERED",
-                            "FAILED",
-                            "BOUNCED",
-                            "SANDBOX"
-                        ],
-                        "type": "string",
-                        "description": "Current delivery status."
-                    },
-                    "providerMessageId": {
-                        "type": "string",
-                        "description": "Upstream provider (SES) message ID."
-                    },
-                    "sentAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "When the email was handed to the provider."
-                    },
-                    "deliveredAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "When delivery was confirmed."
-                    },
-                    "failedAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "When the send failed."
-                    },
-                    "failureReason": {
-                        "type": "string",
-                        "description": "Reason for failure, if failed or bounced."
-                    },
-                    "createdAt": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "updatedAt": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                },
-                "required": [
-                    "id",
-                    "recipient",
-                    "status",
-                    "createdAt",
-                    "updatedAt"
-                ]
-            },
-            "NotificationListDto": {
-                "type": "object",
-                "properties": {
-                    "data": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/NotificationDto"
-                        }
-                    },
-                    "meta": {
-                        "$ref": "#/components/schemas/PaginationMetaDto"
-                    }
-                },
-                "required": [
-                    "data",
-                    "meta"
-                ]
-            },
-            "NotificationStatsDto": {
-                "type": "object",
-                "properties": {
-                    "total": {
-                        "type": "number",
-                        "description": "Total notifications across all statuses."
-                    },
-                    "counts": {
-                        "type": "object",
-                        "additionalProperties": {
-                            "type": "integer"
-                        },
-                        "description": "Count keyed by status.",
-                        "example": {
-                            "DELIVERED": 120,
-                            "BOUNCED": 3,
-                            "QUEUED": 5
-                        }
-                    },
-                    "thisMonth": {
-                        "type": "number",
-                        "description": "Total notifications sent this calendar month."
-                    },
-                    "daily": {
-                        "type": "array",
-                        "description": "Per-day counts by status for the last 30 days.",
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": true
-                        },
-                        "example": [
-                            {
-                                "date": "2026-07-08",
-                                "DELIVERED": 40,
-                                "BOUNCED": 1
-                            }
-                        ]
-                    }
-                },
-                "required": [
-                    "total",
-                    "counts",
-                    "thisMonth",
-                    "daily"
-                ]
-            },
-            "PaginationMetaDto": {
-                "type": "object",
-                "properties": {
-                    "total": {
-                        "type": "number",
-                        "description": "Total number of matching records."
-                    },
-                    "page": {
-                        "type": "number",
-                        "description": "Current page (1-based)."
-                    },
-                    "limit": {
-                        "type": "number",
-                        "description": "Page size."
-                    },
-                    "pages": {
-                        "type": "number",
-                        "description": "Total number of pages."
-                    }
-                },
-                "required": [
-                    "total",
-                    "page",
-                    "limit",
-                    "pages"
-                ]
-            },
-            "RenderTemplateDto": {
-                "type": "object",
-                "properties": {
-                    "data": {
-                        "type": "object",
-                        "additionalProperties": true,
-                        "description": "Sample data to interpolate into the template."
-                    }
+        "responses": {
+          "202": {
+            "description": "Notification queued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendEmailResponseDto"
                 }
-            },
-            "RenderedTemplateDto": {
-                "type": "object",
-                "properties": {
-                    "subject": {
-                        "type": "string"
-                    },
-                    "html": {
-                        "type": "string",
-                        "description": "Rendered HTML body."
-                    },
-                    "text": {
-                        "type": "string",
-                        "description": "Rendered plain-text body."
-                    }
-                },
-                "required": [
-                    "html"
-                ]
-            },
-            "SendEmailDto": {
-                "type": "object",
-                "properties": {
-                    "to": {
-                        "type": "string",
-                        "format": "email",
-                        "description": "Recipient email address."
-                    },
-                    "from": {
-                        "type": "string",
-                        "description": "Sender address on a verified domain. Defaults to the tenant default sender."
-                    },
-                    "subject": {
-                        "type": "string",
-                        "description": "Email subject line. Ignored when a template supplies its own subject."
-                    },
-                    "templateId": {
-                        "type": "string",
-                        "description": "Send using a stored template by ID.",
-                        "format": "uuid"
-                    },
-                    "templateSlug": {
-                        "type": "string",
-                        "description": "Send using a stored template by slug."
-                    },
-                    "locale": {
-                        "type": "string",
-                        "description": "Locale of the template variant to use (e.g. en, pl)."
-                    },
-                    "templateData": {
-                        "type": "object",
-                        "additionalProperties": true,
-                        "description": "Variables interpolated into the template."
-                    },
-                    "html": {
-                        "type": "string",
-                        "description": "Raw HTML body (when not using a template)."
-                    },
-                    "text": {
-                        "type": "string",
-                        "description": "Plain-text body."
-                    },
-                    "stream": {
-                        "type": "string",
-                        "enum": [
-                            "transactional",
-                            "broadcast"
-                        ],
-                        "description": "Message stream \u2014 transactional (default) or broadcast. Isolates reputation + suppression."
-                    }
-                },
-                "required": [
-                    "to"
-                ]
-            },
-            "SendEmailResponseDto": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "description": "ID of the queued notification.",
-                        "format": "uuid"
-                    },
-                    "status": {
-                        "enum": [
-                            "PENDING",
-                            "QUEUED",
-                            "SENT",
-                            "DELIVERED",
-                            "FAILED",
-                            "BOUNCED",
-                            "SANDBOX"
-                        ],
-                        "type": "string",
-                        "description": "Status at time of acceptance. `QUEUED` for a normal send. `SANDBOX` when the account has no verified sending domain \u2014 the message is rendered and stored for preview but never delivered."
-                    },
-                    "from": {
-                        "type": "string",
-                        "description": "Resolved sender address the email will be sent from."
-                    },
-                    "sandbox": {
-                        "type": "boolean",
-                        "description": "Present and `true` only in sandbox mode. Check this in your integration tests to assert you are sending for real. Verify a sending domain to leave sandbox \u2014 no code changes are required."
-                    },
-                    "message": {
-                        "type": "string",
-                        "description": "Human-readable explanation, returned in sandbox mode."
-                    }
-                },
-                "required": [
-                    "id",
-                    "status",
-                    "from"
-                ]
-            },
-            "TemplateDto": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "format": "uuid"
-                    },
-                    "name": {
-                        "type": "string"
-                    },
-                    "slug": {
-                        "type": "string"
-                    },
-                    "locale": {
-                        "type": "string",
-                        "description": "Locale of this variant."
-                    },
-                    "subject": {
-                        "type": "string"
-                    },
-                    "body": {
-                        "type": "string",
-                        "description": "Template body (HTML)."
-                    },
-                    "isActive": {
-                        "type": "boolean"
-                    },
-                    "createdAt": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "updatedAt": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                },
-                "required": [
-                    "id",
-                    "name",
-                    "slug",
-                    "locale",
-                    "body",
-                    "isActive",
-                    "createdAt",
-                    "updatedAt"
-                ]
-            },
-            "UpsertTemplateDto": {
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Human-readable template name."
-                    },
-                    "slug": {
-                        "type": "string",
-                        "description": "URL-safe identifier, unique per tenant + locale."
-                    },
-                    "subject": {
-                        "type": "string",
-                        "description": "Subject line. Supports template variables."
-                    },
-                    "body": {
-                        "type": "string",
-                        "description": "Template body (HTML). Supports variable interpolation."
-                    },
-                    "locale": {
-                        "type": "string",
-                        "description": "Locale of this variant (e.g. en, pl). Defaults to en."
-                    },
-                    "metadata": {
-                        "type": "object",
-                        "additionalProperties": true,
-                        "description": "Arbitrary template metadata."
-                    }
-                },
-                "required": [
-                    "name",
-                    "slug",
-                    "body"
-                ]
+              }
             }
-        }
+          },
+          "401": {
+            "description": "Invalid API key"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Send an email notification",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/batch": {
+      "post": {
+        "description": "Queues up to 500 emails in one call. Each message is validated independently; the response reports per-message queued/rejected status.",
+        "operationId": "sendNotificationBatch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchSendDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Batch processed (see per-message results)"
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Send a batch of email notifications",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/stats": {
+      "get": {
+        "description": "Returns total counts by status, daily breakdown for last 30 days, and this month total.",
+        "operationId": "getNotificationStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Aggregate statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationStatsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Get notification statistics",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "description": "Paginated list of sent notifications for this tenant.",
+        "operationId": "listNotifications",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "PENDING",
+                "QUEUED",
+                "SENT",
+                "DELIVERED",
+                "FAILED",
+                "BOUNCED",
+                "SANDBOX"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Match recipient or subject (case-insensitive).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated notifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationListDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "List notifications",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/{id}": {
+      "get": {
+        "description": "Returns full details of a single notification including delivery status.",
+        "operationId": "getNotification",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notification not found"
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Get notification by ID",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/templates": {
+      "get": {
+        "description": "Returns all templates. Optionally filter by locale.",
+        "operationId": "listTemplates",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "description": "Filter by locale (e.g. en, pl)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TemplateDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "List templates",
+        "tags": [
+          "Templates"
+        ]
+      },
+      "post": {
+        "description": "Create a new template. Set locale to create a translated version.",
+        "operationId": "createTemplate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Create template",
+        "tags": [
+          "Templates"
+        ]
+      }
+    },
+    "/api/v1/templates/slug/{slug}/locales": {
+      "get": {
+        "description": "Returns all locale versions of a template by slug.",
+        "operationId": "listTemplateLocales",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Locale variants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TemplateDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "List all locale variants",
+        "tags": [
+          "Templates"
+        ]
+      }
+    },
+    "/api/v1/templates/{id}": {
+      "get": {
+        "operationId": "getTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found"
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Get template by ID",
+        "tags": [
+          "Templates"
+        ]
+      },
+      "put": {
+        "operationId": "updateTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Update template",
+        "tags": [
+          "Templates"
+        ]
+      },
+      "delete": {
+        "operationId": "deleteTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Delete template",
+        "tags": [
+          "Templates"
+        ]
+      }
+    },
+    "/api/v1/templates/{id}/render": {
+      "post": {
+        "description": "Render template with sample data for preview.",
+        "operationId": "renderTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rendered output",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderedTemplateDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Preview template",
+        "tags": [
+          "Templates"
+        ]
+      }
+    },
+    "/api/v1/domains": {
+      "get": {
+        "operationId": "listDomains",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Domains",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DomainDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "List sender domains",
+        "tags": [
+          "Domains"
+        ]
+      },
+      "post": {
+        "description": "Registers the domain with SES and returns the DNS records to publish.",
+        "operationId": "addDomain",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddDomainDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Domain registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain already registered"
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Add a sender domain",
+        "tags": [
+          "Domains"
+        ]
+      }
+    },
+    "/api/v1/domains/{id}/dns-records": {
+      "get": {
+        "description": "Returns the DNS records to publish and per-record verification state.",
+        "operationId": "getDomainDnsRecords",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DNS records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainDnsRecordsDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain not found"
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Get DNS records",
+        "tags": [
+          "Domains"
+        ]
+      }
+    },
+    "/api/v1/domains/{id}/zone-file": {
+      "get": {
+        "description": "Returns a ready-to-import BIND zone file with all required DNS records.",
+        "operationId": "getDomainZoneFile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Zone file (text/plain attachment)"
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Download BIND zone file",
+        "tags": [
+          "Domains"
+        ]
+      }
+    },
+    "/api/v1/domains/{id}/verify": {
+      "post": {
+        "description": "Re-checks SES + DNS state and updates the domain status.",
+        "operationId": "verifyDomain",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain not found"
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Trigger domain verification",
+        "tags": [
+          "Domains"
+        ]
+      }
+    },
+    "/api/v1/domains/{id}": {
+      "delete": {
+        "description": "Removes the domain from SES and Pulsenote.",
+        "operationId": "deleteDomain",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "404": {
+            "description": "Domain not found"
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Delete a sender domain",
+        "tags": [
+          "Domains"
+        ]
+      }
+    },
+    "/api/v1/suppressions": {
+      "get": {
+        "description": "Addresses this tenant will not send to (bounces, complaints, manual). Newest first, capped at 500.",
+        "operationId": "listSuppressions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Suppressed recipients, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SuppressionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "List suppressed recipients",
+        "tags": [
+          "Suppressions"
+        ]
+      },
+      "post": {
+        "description": "Idempotent per address and stream — re-adding refreshes the existing entry rather than failing.",
+        "operationId": "addSuppression",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddSuppressionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Address suppressed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddedSuppressionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Manually suppress an address",
+        "tags": [
+          "Suppressions"
+        ]
+      }
+    },
+    "/api/v1/suppressions/{id}": {
+      "delete": {
+        "operationId": "deleteSuppression",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suppression removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuppressionRemovedDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such suppression for this tenant"
+          }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Remove a suppression (re-allow sending)",
+        "tags": [
+          "Suppressions"
+        ]
+      }
     }
+  },
+  "info": {
+    "title": "Pulsenote API",
+    "description": "Send transactional emails at scale. Authenticate every request with your API key in the `X-API-Key` header. Find your key in the Pulsenote dashboard under Settings → API Keys.",
+    "version": "1.0",
+    "contact": {
+      "name": "Pulsenote",
+      "url": "https://pulsenote.eu",
+      "email": "support@pulsenote.eu"
+    }
+  },
+  "tags": [
+    {
+      "name": "Notifications",
+      "description": "Send emails, check delivery status, and view statistics."
+    },
+    {
+      "name": "Templates",
+      "description": "Create and manage reusable email templates with variable interpolation."
+    },
+    {
+      "name": "Domains",
+      "description": "Register sender domains and verify them via DNS."
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://api.pulsenote.eu",
+      "description": "Production"
+    },
+    {
+      "url": "https://pulsenote-api.sysgp.eu",
+      "description": "Staging"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "api-key": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "Your tenant API key. Find it in the dashboard under Settings → API Keys."
+      }
+    },
+    "schemas": {
+      "EmailAttachmentDto": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "File name shown to the recipient, e.g. `invoice-2026-08.pdf`."
+          },
+          "content": {
+            "type": "string",
+            "description": "Base64-encoded file contents."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "MIME type. Defaults to `application/octet-stream`.",
+            "example": "application/pdf"
+          },
+          "contentId": {
+            "type": "string",
+            "description": "Embed the file in the HTML body instead of listing it as a download. Reference it as `cid:<contentId>` in your HTML."
+          }
+        },
+        "required": [
+          "filename",
+          "content"
+        ]
+      },
+      "SendEmailDto": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "email",
+            "description": "Recipient email address."
+          },
+          "cc": {
+            "description": "Carbon-copy recipients, visible to everyone on the message. Accepts a single address or a list. Counts toward the 50-recipient limit shared with `to` and `bcc`.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bcc": {
+            "description": "Blind-carbon-copy recipients, hidden from other recipients. Accepts a single address or a list. Counts toward the 50-recipient limit shared with `to` and `cc`.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "replyTo": {
+            "description": "Where replies should go, when that differs from `from`. Accepts a single address or a list. Unlike `from`, these addresses do not need to be on a verified domain.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "attachments": {
+            "description": "Files to attach, up to 20 per message and 10 MB in total (decoded).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmailAttachmentDto"
+            }
+          },
+          "from": {
+            "type": "string",
+            "description": "Sender address on a verified domain. Defaults to the tenant default sender."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Email subject line. Ignored when a template supplies its own subject."
+          },
+          "templateId": {
+            "type": "string",
+            "description": "Send using a stored template by ID.",
+            "format": "uuid"
+          },
+          "templateSlug": {
+            "type": "string",
+            "description": "Send using a stored template by slug."
+          },
+          "locale": {
+            "type": "string",
+            "description": "Locale of the template variant to use (e.g. en, pl)."
+          },
+          "templateData": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Variables interpolated into the template."
+          },
+          "html": {
+            "type": "string",
+            "description": "Raw HTML body (when not using a template)."
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain-text body."
+          },
+          "stream": {
+            "type": "string",
+            "enum": [
+              "transactional",
+              "broadcast"
+            ],
+            "description": "Message stream — transactional (default) or broadcast. Isolates reputation + suppression."
+          }
+        },
+        "required": [
+          "to"
+        ]
+      },
+      "SendEmailResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID of the queued notification.",
+            "format": "uuid"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "QUEUED",
+              "SENT",
+              "DELIVERED",
+              "FAILED",
+              "BOUNCED",
+              "SANDBOX"
+            ],
+            "type": "string",
+            "description": "Status at time of acceptance. `QUEUED` for a normal send. `SANDBOX` when the account has no verified sending domain — the message is rendered and stored for preview but never delivered."
+          },
+          "from": {
+            "type": "string",
+            "description": "Resolved sender address the email will be sent from."
+          },
+          "sandbox": {
+            "type": "boolean",
+            "description": "Present and `true` only in sandbox mode. Check this in your integration tests to assert you are sending for real. Verify a sending domain to leave sandbox — no code changes are required."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable explanation, returned in sandbox mode."
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "from"
+        ]
+      },
+      "BatchSendDto": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "description": "Up to 500 messages to queue in one call.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SendEmailDto"
+            }
+          }
+        },
+        "required": [
+          "messages"
+        ]
+      },
+      "NotificationStatsDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "Total notifications across all statuses."
+          },
+          "counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Count keyed by status.",
+            "example": {
+              "DELIVERED": 120,
+              "BOUNCED": 3,
+              "QUEUED": 5
+            }
+          },
+          "thisMonth": {
+            "type": "number",
+            "description": "Total notifications sent this calendar month."
+          },
+          "daily": {
+            "type": "array",
+            "description": "Per-day counts by status for the last 30 days.",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "example": [
+              {
+                "date": "2026-07-08",
+                "DELIVERED": 40,
+                "BOUNCED": 1
+              }
+            ]
+          }
+        },
+        "required": [
+          "total",
+          "counts",
+          "thisMonth",
+          "daily"
+        ]
+      },
+      "NotificationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipient": {
+            "type": "string",
+            "description": "Recipient email address."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Email subject line."
+          },
+          "templateId": {
+            "type": "string",
+            "description": "ID of the template used, if any.",
+            "format": "uuid"
+          },
+          "templateName": {
+            "type": "string",
+            "description": "Name of the template used, if any."
+          },
+          "fromAddress": {
+            "type": "string",
+            "description": "Sender email address."
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "QUEUED",
+              "SENT",
+              "DELIVERED",
+              "FAILED",
+              "BOUNCED",
+              "SANDBOX"
+            ],
+            "type": "string",
+            "description": "Current delivery status."
+          },
+          "providerMessageId": {
+            "type": "string",
+            "description": "Upstream provider (SES) message ID."
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the email was handed to the provider."
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When delivery was confirmed."
+          },
+          "failedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the send failed."
+          },
+          "failureReason": {
+            "type": "string",
+            "description": "Reason for failure, if failed or bounced."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "recipient",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PaginationMetaDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "Total number of matching records."
+          },
+          "page": {
+            "type": "number",
+            "description": "Current page (1-based)."
+          },
+          "limit": {
+            "type": "number",
+            "description": "Page size."
+          },
+          "pages": {
+            "type": "number",
+            "description": "Total number of pages."
+          }
+        },
+        "required": [
+          "total",
+          "page",
+          "limit",
+          "pages"
+        ]
+      },
+      "NotificationListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "TemplateDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string",
+            "description": "Locale of this variant."
+          },
+          "subject": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "description": "Template body (HTML)."
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "locale",
+          "body",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpsertTemplateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Human-readable template name."
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL-safe identifier, unique per tenant + locale."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Subject line. Supports template variables."
+          },
+          "body": {
+            "type": "string",
+            "description": "Template body (HTML). Supports variable interpolation."
+          },
+          "locale": {
+            "type": "string",
+            "description": "Locale of this variant (e.g. en, pl). Defaults to en."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Arbitrary template metadata."
+          }
+        },
+        "required": [
+          "name",
+          "slug",
+          "body"
+        ]
+      },
+      "RenderTemplateDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Sample data to interpolate into the template."
+          }
+        }
+      },
+      "RenderedTemplateDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string",
+            "description": "Rendered HTML body."
+          },
+          "text": {
+            "type": "string",
+            "description": "Rendered plain-text body."
+          }
+        },
+        "required": [
+          "html"
+        ]
+      },
+      "DnsRecordDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "CNAME",
+              "MX",
+              "TXT"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Record name/host."
+          },
+          "value": {
+            "type": "string",
+            "description": "Record value."
+          },
+          "purpose": {
+            "type": "string",
+            "description": "What this record is for."
+          },
+          "priority": {
+            "type": "number",
+            "description": "Priority (MX records only)."
+          }
+        },
+        "required": [
+          "type",
+          "name",
+          "value",
+          "purpose"
+        ]
+      },
+      "DomainDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string",
+            "description": "AWS SES region this domain sends from (null = platform default)."
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "VERIFYING",
+              "VERIFIED",
+              "FAILED"
+            ],
+            "type": "string",
+            "description": "Verification status."
+          },
+          "spfVerified": {
+            "type": "boolean",
+            "description": "Whether the SPF (MAIL FROM) record is verified."
+          },
+          "dkimVerified": {
+            "type": "boolean",
+            "description": "Whether DKIM signing is verified."
+          },
+          "dmarcVerified": {
+            "type": "boolean",
+            "description": "Whether a DMARC policy is present."
+          },
+          "fromEmail": {
+            "type": "string",
+            "description": "Default from address for this domain."
+          },
+          "fromName": {
+            "type": "string",
+            "description": "Default display name."
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Whether this is the tenant default sender domain."
+          },
+          "verifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dnsRecords": {
+            "description": "DNS records to publish (returned on add/verify).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DnsRecordDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "domain",
+          "status",
+          "spfVerified",
+          "dkimVerified",
+          "dmarcVerified",
+          "isDefault",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AddDomainDto": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "Domain to send from, e.g. mail.example.com."
+          },
+          "fromEmail": {
+            "type": "string",
+            "format": "email",
+            "description": "Default from address for this domain. Defaults to noreply@<domain>."
+          },
+          "fromName": {
+            "type": "string",
+            "description": "Default display name for this domain."
+          },
+          "region": {
+            "type": "string",
+            "enum": [
+              "eu-west-1"
+            ],
+            "description": "AWS region to host this domain’s SES identity in (data residency / jurisdiction of processing). Must be a supported region; defaults to the platform region if omitted."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      },
+      "DomainDnsRecordsDto": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "VERIFYING",
+              "VERIFIED",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DnsRecordDto"
+            }
+          },
+          "spfVerified": {
+            "type": "boolean"
+          },
+          "dkimVerified": {
+            "type": "boolean"
+          },
+          "dmarcVerified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "domain",
+          "status",
+          "records",
+          "spfVerified",
+          "dkimVerified",
+          "dmarcVerified"
+        ]
+      },
+      "SuppressionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "description": "Suppressed address, always stored lower-cased and trimmed."
+          },
+          "stream": {
+            "enum": [
+              "transactional",
+              "broadcast"
+            ],
+            "type": "string",
+            "description": "Suppression is per stream: blocking a marketing address does not stop a password reset."
+          },
+          "reason": {
+            "enum": [
+              "bounce",
+              "complaint",
+              "manual"
+            ],
+            "type": "string",
+            "description": "bounce and complaint are added automatically from provider feedback; manual is yours."
+          },
+          "detail": {
+            "type": "string",
+            "description": "Provider text for an automatic entry, or a note for a manual one."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "stream",
+          "reason",
+          "createdAt"
+        ]
+      },
+      "AddSuppressionDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Address to suppress. Normalised to lower case and trimmed.",
+            "example": "bounced@example.com"
+          },
+          "stream": {
+            "enum": [
+              "transactional",
+              "broadcast"
+            ],
+            "type": "string",
+            "default": "transactional",
+            "description": "Stream to suppress on. Suppression is per stream, so blocking a broadcast address still lets transactional mail through."
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "AddedSuppressionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "stream": {
+            "enum": [
+              "transactional",
+              "broadcast"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "bounce",
+              "complaint",
+              "manual"
+            ],
+            "type": "string",
+            "description": "Always manual for this endpoint."
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "stream",
+          "reason"
+        ]
+      },
+      "SuppressionRemovedDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Suppression removed"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      }
+    }
+  }
 }
