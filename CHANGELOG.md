@@ -4,6 +4,14 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0](https://github.com/Pulsenote/pulsenote-php/compare/1.2.0...1.3.0) (2026-08-30)
+
+
+### Features
+
+* expose the message stream on send() ([#14](https://github.com/Pulsenote/pulsenote-php/issues/14)) ([c285bdd](https://github.com/Pulsenote/pulsenote-php/commit/c285bdd8949260eeaa675bc35bf5b23c05e3dfa5))
+* suppressions resource ([#12](https://github.com/Pulsenote/pulsenote-php/issues/12)) ([3784586](https://github.com/Pulsenote/pulsenote-php/commit/3784586141a2618e1c7dacd3b87e75bdc0a1a97c))
+
 ## [1.2.0](https://github.com/Pulsenote/pulsenote-php/compare/1.1.0...1.2.0) (2026-08-26)
 
 
