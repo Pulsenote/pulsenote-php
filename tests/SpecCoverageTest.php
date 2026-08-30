@@ -6,9 +6,7 @@ namespace Pulsenote\Tests;
 
 use PHPUnit\Framework\TestCase;
 use Pulsenote\Internal\Operation;
-use Pulsenote\Resource\Domains;
-use Pulsenote\Resource\Notifications;
-use Pulsenote\Resource\Templates;
+use Pulsenote\Resource\Resource;
 
 /**
  * The drift guard.
@@ -23,7 +21,41 @@ use Pulsenote\Resource\Templates;
  */
 final class SpecCoverageTest extends TestCase
 {
-    private const RESOURCES = [Notifications::class, Templates::class, Domains::class];
+    /**
+     * Every concrete resource class, discovered from the filesystem.
+     *
+     * This used to be a hand-maintained list of three class names, which meant a
+     * new resource was silently absent from the guard until somebody remembered
+     * to add it — the same shape of bug the guard exists to catch. Discovery
+     * cannot forget.
+     *
+     * @return list<class-string>
+     */
+    private static function resources(): array
+    {
+        $classes = [];
+
+        foreach (glob(__DIR__ . '/../src/Resource/*.php') ?: [] as $file) {
+            $class = 'Pulsenote\\Resource\\' . basename($file, '.php');
+
+            if (!class_exists($class)) {
+                continue;
+            }
+
+            $reflection = new \ReflectionClass($class);
+
+            // The abstract base carries no operations of its own.
+            if ($reflection->isAbstract() || !$reflection->isSubclassOf(Resource::class)) {
+                continue;
+            }
+
+            $classes[] = $class;
+        }
+
+        self::assertNotEmpty($classes, 'No resource classes found — has src/Resource moved?');
+
+        return $classes;
+    }
 
     /**
      * Operations the SDK deliberately does not expose. Keep this empty unless there is
@@ -63,7 +95,7 @@ final class SpecCoverageTest extends TestCase
     {
         $operations = [];
 
-        foreach (self::RESOURCES as $class) {
+        foreach (self::resources() as $class) {
             foreach ((new \ReflectionClass($class))->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
                 foreach ($method->getAttributes(Operation::class) as $attribute) {
                     $operation = $attribute->newInstance();
