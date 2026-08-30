@@ -89,6 +89,123 @@ final class SpecCoverageTest extends TestCase
     }
 
     /**
+     * The committed spec, decoded.
+     *
+     * @return array<string,mixed>
+     */
+    private static function spec(): array
+    {
+        $path = __DIR__ . '/../openapi/pulsenote-api.json';
+        self::assertFileExists($path, 'The committed OpenAPI spec is missing.');
+
+        /** @var array<string,mixed> $spec */
+        $spec = json_decode((string) file_get_contents($path), true, 512, \JSON_THROW_ON_ERROR);
+
+        return $spec;
+    }
+
+    /**
+     * Every request-body field the spec defines, per operation.
+     *
+     * @return array<string, list<string>> operationId => property names
+     */
+    private static function specRequestFields(): array
+    {
+        $spec = self::spec();
+        $fields = [];
+
+        foreach ($spec['paths'] as $methods) {
+            foreach ($methods as $operation) {
+                if (!is_array($operation) || !isset($operation['operationId'])) {
+                    continue;
+                }
+
+                $schema = $operation['requestBody']['content']['application/json']['schema'] ?? null;
+                // A batch endpoint wraps its items; follow the array to the item schema.
+                $ref = $schema['$ref'] ?? $schema['items']['$ref'] ?? null;
+                if (!is_string($ref)) {
+                    continue;
+                }
+
+                $name = substr($ref, (int) strrpos($ref, '/') + 1);
+                $properties = $spec['components']['schemas'][$name]['properties'] ?? [];
+                // array_keys() is typed as list<int|string>; JSON object keys are
+                // always strings, and phpstan cannot know that from the shape alone.
+                $fields[$operation['operationId']] = array_map(
+                    static fn (int|string $key): string => (string) $key,
+                    array_keys($properties),
+                );
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Parameter names of the SDK method implementing each operation.
+     *
+     * @return array<string, list<string>>
+     */
+    private static function sdkParameters(): array
+    {
+        $params = [];
+
+        foreach (self::resources() as $class) {
+            foreach ((new \ReflectionClass($class))->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+                foreach ($method->getAttributes(Operation::class) as $attribute) {
+                    $params[$attribute->newInstance()->id] = array_map(
+                        static fn (\ReflectionParameter $p): string => $p->getName(),
+                        $method->getParameters(),
+                    );
+                }
+            }
+        }
+
+        return $params;
+    }
+
+    /**
+     * Operations whose body this SDK deliberately does not spell out field by field.
+     *
+     * @var array<string,string>
+     */
+    private const BODY_TAKEN_WHOLE = [
+        // Takes a list of Message objects; the fields live on the model, not the signature.
+        'sendNotificationBatch' => 'accepts a list of message models rather than scalars',
+    ];
+
+    /**
+     * The operation-level guard above catches an endpoint the SDK cannot reach at
+     * all. It says nothing about an endpoint that exists but has grown a field the
+     * caller cannot set — which is the drift that actually happened: `region` was
+     * missing from addDomain here while every other check stayed green, and
+     * `stream` went the same way in the Node SDK. See GP-54.
+     */
+    public function testEveryRequestFieldIsReachableFromTheSdk(): void
+    {
+        $params = self::sdkParameters();
+        $missing = [];
+
+        foreach (self::specRequestFields() as $operationId => $fields) {
+            if (isset(self::BODY_TAKEN_WHOLE[$operationId]) || !isset($params[$operationId])) {
+                continue;
+            }
+
+            $absent = array_values(array_diff($fields, $params[$operationId]));
+            if ($absent !== []) {
+                $missing[$operationId] = $absent;
+            }
+        }
+
+        self::assertSame(
+            [],
+            $missing,
+            "Request fields in the spec with no matching SDK parameter:\n  "
+            . json_encode($missing, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES),
+        );
+    }
+
+    /**
      * @return array<string,string> operationId => "METHOD /path", as declared by the SDK
      */
     private static function sdkOperations(): array

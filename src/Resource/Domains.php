@@ -38,12 +38,21 @@ final class Domains extends Resource
      * @param string      $domain    Domain to send from, e.g. `mail.example.com`.
      * @param string|null $fromEmail Default from address. Defaults to `noreply@<domain>`.
      * @param string|null $fromName  Default display name for this domain.
+     * @param string|null $region    AWS region hosting this domain's SES identity, and
+     *                               therefore the jurisdiction its sending is processed in.
+     *                               Defaults to the platform region. Currently `eu-west-1`
+     *                               is the only supported value; passing an unsupported one
+     *                               is rejected by the API rather than silently ignored.
      *
      * @throws \Pulsenote\Exception\ConflictException The domain is already registered.
      */
     #[Operation('addDomain', 'POST', '/api/v1/domains')]
-    public function add(string $domain, ?string $fromEmail = null, ?string $fromName = null): Domain
-    {
+    public function add(
+        string $domain,
+        ?string $fromEmail = null,
+        ?string $fromName = null,
+        ?string $region = null,
+    ): Domain {
         return Domain::fromArray($this->transport->requestObject(
             'POST',
             '/api/v1/domains',
@@ -51,6 +60,7 @@ final class Domains extends Resource
                 'domain' => $domain,
                 'fromEmail' => $fromEmail,
                 'fromName' => $fromName,
+                'region' => $region,
             ],
         ));
     }
