@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pulsenote\Tests;
 
 use Pulsenote\Enum\BatchMessageStatus;
+use Pulsenote\Enum\MessageStream;
 use Pulsenote\Enum\NotificationStatus;
 use Pulsenote\Exception\ConfigurationException;
 use Pulsenote\Exception\TransportException;
@@ -113,6 +114,29 @@ final class NotificationsTest extends TestCase
 
         // An explicit null would clobber the tenant's server-side defaults (sender, locale).
         self::assertSame(['to' => 'greg@example.com', 'html' => '<b>Hi</b>'], $this->http->lastBody());
+    }
+
+    public function testSendCarriesTheMessageStream(): void
+    {
+        $this->http->push(202, ['id' => 'abc', 'status' => 'QUEUED', 'from' => 'noreply@sysgp.eu']);
+
+        $this->client()->notifications->send(
+            to: 'greg@example.com',
+            html: '<b>Hi</b>',
+            stream: MessageStream::Broadcast,
+        );
+
+        self::assertSame('broadcast', $this->http->lastBody()['stream'] ?? null);
+    }
+
+    public function testSendOmitsTheStreamWhenNotGiven(): void
+    {
+        $this->http->push(202, ['id' => 'abc', 'status' => 'QUEUED', 'from' => 'noreply@sysgp.eu']);
+
+        $this->client()->notifications->send(to: 'greg@example.com', html: '<b>Hi</b>');
+
+        // Sending an explicit null would override the API's transactional default.
+        self::assertArrayNotHasKey('stream', $this->http->lastBody());
     }
 
     public function testSendCarriesTemplateData(): void

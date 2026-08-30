@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pulsenote\Resource;
 
+use Pulsenote\Enum\MessageStream;
 use Pulsenote\Enum\NotificationStatus;
 use Pulsenote\Exception\ConfigurationException;
 use Pulsenote\Internal\Operation;
@@ -83,6 +84,7 @@ final class Notifications extends Resource
         ?array $bcc = null,
         ?array $replyTo = null,
         ?array $attachments = null,
+        ?MessageStream $stream = null,
     ): SendEmailResponse {
         return SendEmailResponse::fromArray($this->transport->requestObject(
             'POST',
@@ -101,6 +103,7 @@ final class Notifications extends Resource
                 'templateSlug' => $templateSlug,
                 'locale' => $locale,
                 'templateData' => $templateData,
+                'stream' => $stream?->value,
             ],
         ));
     }
