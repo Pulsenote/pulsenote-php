@@ -66,6 +66,46 @@ final class Domains extends Resource
     }
 
     /**
+     * Change the sender identity of a domain you already added.
+     *
+     * The point of `$fromName` is one account sending under several brands:
+     * give each domain its own display name and recipients see the right one,
+     * instead of the account name on everything. Pass an empty string to clear
+     * it and fall back to the account name.
+     *
+     * The domain name itself is not editable — that is a different SES identity
+     * with different DNS records, so it is an {@see add()} plus a {@see delete()}.
+     *
+     * Only the arguments you pass are changed; omitted ones are left alone.
+     *
+     * @param string|null $fromEmail Must be an address on this domain: SES only
+     *                               signs mail for the identity it verified.
+     * @param string|null $fromName  Display name recipients see. '' clears it.
+     * @param bool|null   $isDefault Use this domain when a send omits `from`.
+     *                               Promoting one demotes the previous default.
+     *
+     * @throws \Pulsenote\Exception\NotFoundException   No such domain for this tenant.
+     * @throws \Pulsenote\Exception\ValidationException `$fromEmail` is not on this domain.
+     */
+    #[Operation('updateDomain', 'PATCH', '/api/v1/domains/{id}')]
+    public function update(
+        string $id,
+        ?string $fromEmail = null,
+        ?string $fromName = null,
+        ?bool $isDefault = null,
+    ): Domain {
+        return Domain::fromArray($this->transport->requestObject(
+            'PATCH',
+            '/api/v1/domains/' . rawurlencode($id),
+            body: [
+                'fromEmail' => $fromEmail,
+                'fromName' => $fromName,
+                'isDefault' => $isDefault,
+            ],
+        ));
+    }
+
+    /**
      * The DNS records this domain needs, plus what Pulsenote can currently resolve.
      *
      * @throws \Pulsenote\Exception\NotFoundException No such domain for this tenant.
