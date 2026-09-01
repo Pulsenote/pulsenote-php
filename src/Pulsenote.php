@@ -41,7 +41,7 @@ use Pulsenote\Resource\Templates;
 final class Pulsenote
 {
     /** SDK version, sent in the `User-Agent`. Keep in step with CHANGELOG.md. */
-    public const VERSION = '1.3.0'; // x-release-please-version
+    public const VERSION = '1.4.0'; // x-release-please-version
 
     /** Default API base URL. */
     public const DEFAULT_BASE_URL = 'https://pulsenote-api.sysgp.eu';
