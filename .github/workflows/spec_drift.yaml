@@ -24,10 +24,16 @@ jobs:
 
       - run: composer update --prefer-dist --no-interaction --no-progress
 
+      # Default to the PUBLIC spec, which is what fetch-spec.php uses too.
+      # This used to point at the internal sysgp.eu host, which no longer
+      # resolves — so every scheduled run since then died on the fetch and this
+      # guard has been checking nothing while reporting a failure that looked
+      # like drift. A guard whose failure means "I could not run" is worse than
+      # no guard: it trains you to ignore the red.
       - name: Refresh the committed spec
         run: php scripts/fetch-spec.php
         env:
-          SPEC_URL: ${{ vars.PULSENOTE_SPEC_URL || 'https://pulsenote-api.sysgp.eu/api-json' }}
+          SPEC_URL: ${{ vars.PULSENOTE_SPEC_URL || 'https://pulsenote.eu/openapi.json' }}
 
       - name: Diff the SDK against it
         id: drift

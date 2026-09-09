@@ -2,7 +2,7 @@
     "openapi": "3.0.0",
     "info": {
         "title": "Pulsenote API",
-        "description": "Pulsenote email notification platform API. Use your tenant API key (X-API-Key header) to authenticate notification endpoints, or Bearer JWT token for user/team management endpoints.",
+        "description": "Send transactional emails at scale. Authenticate every request with your API key in the `X-API-Key` header. Find your key in the Pulsenote dashboard under Settings \u2192 API Keys.",
         "version": "1.0",
         "contact": {}
     },
@@ -19,15 +19,15 @@
     "tags": [
         {
             "name": "Notifications",
-            "description": "Send and track email notifications"
+            "description": "Send emails, check delivery status, and view statistics."
         },
         {
             "name": "Templates",
-            "description": "Manage email templates"
+            "description": "Create and manage reusable email templates with variable interpolation."
         },
         {
             "name": "Domains",
-            "description": "Manage sender domains and DNS verification"
+            "description": "Register sender domains and verify them via DNS."
         }
     ],
     "paths": {
@@ -976,7 +976,7 @@
                 "type": "apiKey",
                 "in": "header",
                 "name": "X-API-Key",
-                "description": "Tenant API key for notification endpoints"
+                "description": "Your tenant API key. Find it in the dashboard under Settings \u2192 API Keys."
             }
         },
         "schemas": {
