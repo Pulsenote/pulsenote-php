@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Pulsenote\Resource;
 
+use Pulsenote\Enum\ImportConflictPolicy;
 use Pulsenote\Internal\Operation;
+use Pulsenote\Model\ExportedTemplate;
 use Pulsenote\Model\RenderedTemplate;
 use Pulsenote\Model\Template;
+use Pulsenote\Model\TemplateExport;
+use Pulsenote\Model\TemplateImportResult;
 
 /**
  * Stored email templates, one row per (slug, locale) pair.
@@ -129,6 +133,70 @@ final class Templates extends Resource
             'POST',
             $this->path('/api/v1/templates/{id}/render', ['id' => $id]),
             body: ['data' => $data],
+        ));
+    }
+
+    /**
+     * Export every template as a portable file.
+     *
+     * Identity in the result is `slug` + `locale`; no IDs are included, so the
+     * file can go straight into {@see self::import()} on another account —
+     * moving between organisations, seeding a staging tenant, or keeping a
+     * backup that is yours rather than ours.
+     *
+     * ```php
+     * $file = $pulsenote->templates->export();
+     * file_put_contents('templates.json', json_encode($file->templates));
+     * ```
+     */
+    #[Operation('exportTemplates', 'GET', '/api/v1/templates/export')]
+    public function export(): TemplateExport
+    {
+        return TemplateExport::fromArray($this->transport->requestObject(
+            'GET',
+            '/api/v1/templates/export',
+        ));
+    }
+
+    /**
+     * Load templates into this account.
+     *
+     * A template that is already there (same slug and locale) is **skipped**
+     * unless `$onConflict` says otherwise. That default is deliberate:
+     * replacing a live template is not something to do by accident, and this
+     * method does not throw when it skips — read the result.
+     *
+     * Your plan's template limit applies to the import as a whole, counting
+     * distinct slugs, so locale variants of one template cost no extra quota.
+     *
+     * @param list<ExportedTemplate|array<string,mixed>> $templates Templates to load.
+     * @param ImportConflictPolicy|null                  $onConflict Defaults to skip.
+     * @param int|null                                   $version    Format version of the file. Defaults to the current one.
+     *
+     * @throws \Pulsenote\Exception\AuthenticationException The import would exceed the plan's template limit (403).
+     * @throws \Pulsenote\Exception\ValidationException Malformed file, or a version this API cannot read.
+     */
+    #[Operation('importTemplates', 'POST', '/api/v1/templates/import')]
+    public function import(
+        array $templates,
+        ?ImportConflictPolicy $onConflict = null,
+        ?int $version = null,
+    ): TemplateImportResult {
+        return TemplateImportResult::fromArray($this->transport->requestObject(
+            'POST',
+            '/api/v1/templates/import',
+            body: [
+                'version' => $version,
+                'templates' => array_map(
+                    static fn (ExportedTemplate|array $t): array => $t instanceof ExportedTemplate
+                        ? $t->jsonSerialize()
+                        : $t,
+                    $templates,
+                ),
+                // Left null when not given, so the API's default applies rather
+                // than a default this SDK invented.
+                'onConflict' => $onConflict?->value,
+            ],
         ));
     }
 

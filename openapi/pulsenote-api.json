@@ -2,7 +2,7 @@
     "openapi": "3.0.0",
     "info": {
         "title": "Pulsenote API",
-        "description": "Send transactional emails at scale. Authenticate every request with your API key in the `X-API-Key` header. Find your key in the Pulsenote dashboard under Settings \u2192 API Keys.",
+        "description": "Pulsenote email notification platform API. Use your tenant API key (X-API-Key header) to authenticate notification endpoints, or Bearer JWT token for user/team management endpoints.",
         "version": "1.0",
         "contact": {}
     },
@@ -19,15 +19,15 @@
     "tags": [
         {
             "name": "Notifications",
-            "description": "Send emails, check delivery status, and view statistics."
+            "description": "Send and track email notifications"
         },
         {
             "name": "Templates",
-            "description": "Create and manage reusable email templates with variable interpolation."
+            "description": "Manage email templates"
         },
         {
             "name": "Domains",
-            "description": "Register sender domains and verify them via DNS."
+            "description": "Manage sender domains and DNS verification"
         }
     ],
     "paths": {
@@ -322,6 +322,34 @@
                 ]
             }
         },
+        "/api/v1/templates/export": {
+            "get": {
+                "description": "Returns every template as a portable file. Identity in the file is slug + locale; internal ids are not included, so the result can be imported into another account as-is.",
+                "operationId": "exportTemplates",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "Export",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TemplateExportDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api-key": []
+                    }
+                ],
+                "summary": "Export all templates",
+                "tags": [
+                    "Templates"
+                ]
+            }
+        },
         "/api/v1/templates/slug/{slug}/locales": {
             "get": {
                 "description": "Returns all locale versions of a template by slug.",
@@ -467,6 +495,50 @@
                     }
                 ],
                 "summary": "Delete template",
+                "tags": [
+                    "Templates"
+                ]
+            }
+        },
+        "/api/v1/templates/import": {
+            "post": {
+                "description": "Loads an export file into this account. A template already present (same slug + locale) is skipped unless onConflict is set to overwrite. Plan template limits apply, counted over the whole import.",
+                "operationId": "importTemplates",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportTemplatesDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Import result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TemplateImportResultDto"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed or unsupported file"
+                    },
+                    "403": {
+                        "description": "Plan template limit reached"
+                    }
+                },
+                "security": [
+                    {
+                        "api-key": []
+                    }
+                ],
+                "summary": "Import templates",
                 "tags": [
                     "Templates"
                 ]
@@ -904,7 +976,7 @@
                 "type": "apiKey",
                 "in": "header",
                 "name": "X-API-Key",
-                "description": "Your tenant API key. Find it in the dashboard under Settings \u2192 API Keys."
+                "description": "Tenant API key for notification endpoints"
             }
         },
         "schemas": {
@@ -1187,6 +1259,97 @@
                 "required": [
                     "filename",
                     "content"
+                ]
+            },
+            "ExportedTemplateDto": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string",
+                        "description": "URL-safe identifier, unique per locale."
+                    },
+                    "locale": {
+                        "type": "string",
+                        "description": "Locale of this variant (e.g. en, pl)."
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "subject": {
+                        "type": "string",
+                        "description": "Subject line."
+                    },
+                    "body": {
+                        "type": "string",
+                        "description": "Template body (HTML)."
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "Arbitrary template metadata."
+                    },
+                    "isActive": {
+                        "type": "boolean",
+                        "description": "Defaults to true on import."
+                    }
+                },
+                "required": [
+                    "slug",
+                    "locale",
+                    "name",
+                    "body"
+                ]
+            },
+            "ImportTemplatesDto": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "number",
+                        "description": "Format version of the file being imported. Defaults to the current version.",
+                        "example": 1
+                    },
+                    "templates": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ExportedTemplateDto"
+                        }
+                    },
+                    "onConflict": {
+                        "enum": [
+                            "skip",
+                            "overwrite"
+                        ],
+                        "type": "string",
+                        "default": "skip",
+                        "description": "What to do with a template that already exists (same slug + locale)."
+                    }
+                },
+                "required": [
+                    "templates"
+                ]
+            },
+            "ImportedTemplateResultDto": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string"
+                    },
+                    "locale": {
+                        "type": "string"
+                    },
+                    "result": {
+                        "enum": [
+                            "created",
+                            "updated",
+                            "skipped"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "slug",
+                    "locale",
+                    "result"
                 ]
             },
             "NotificationDto": {
@@ -1728,6 +1891,57 @@
                     "isActive",
                     "createdAt",
                     "updatedAt"
+                ]
+            },
+            "TemplateExportDto": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "number",
+                        "description": "Format version of this file.",
+                        "example": 1
+                    },
+                    "exportedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "templates": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ExportedTemplateDto"
+                        }
+                    }
+                },
+                "required": [
+                    "version",
+                    "exportedAt",
+                    "templates"
+                ]
+            },
+            "TemplateImportResultDto": {
+                "type": "object",
+                "properties": {
+                    "created": {
+                        "type": "number"
+                    },
+                    "updated": {
+                        "type": "number"
+                    },
+                    "skipped": {
+                        "type": "number"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ImportedTemplateResultDto"
+                        }
+                    }
+                },
+                "required": [
+                    "created",
+                    "updated",
+                    "skipped",
+                    "results"
                 ]
             },
             "UpdateDomainDto": {

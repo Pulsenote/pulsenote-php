@@ -326,6 +326,33 @@ $pulsenote = new Pulsenote(
 );
 ```
 
+### Moving templates between accounts
+
+```php
+$file = $source->templates->export();
+$result = $target->templates->import($file->templates);
+
+echo $result->created, ' created, ', $result->skipped, ' skipped', PHP_EOL;
+```
+
+Identity inside the file is `slug` + `locale`, not an ID, so importing the same
+export twice does nothing the second time. A template that already exists is
+**skipped** and the call does **not** throw — read `$result->skipped` (or
+`$result->skipped()` for the list) rather than assuming silence means success.
+
+To replace what is there, say so:
+
+```php
+use Pulsenote\Enum\ImportConflictPolicy;
+
+$target->templates->import($file->templates, ImportConflictPolicy::Overwrite);
+```
+
+Your plan's template limit applies to the import as a whole, counting distinct
+slugs — locale variants of one template consume no extra quota. An import that
+would take you over the limit is refused before anything is written, so it never
+lands half-applied.
+
 ## Scope
 
 v1 covers the **data plane** — the endpoints authenticated with your `X-API-Key`

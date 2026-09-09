@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Pulsenote\Tests;
 
+use Pulsenote\Enum\ImportConflictPolicy;
+use Pulsenote\Model\ExportedTemplate;
 use Pulsenote\Tests\Support\TestCase;
 
 final class TemplatesTest extends TestCase
@@ -129,5 +131,87 @@ final class TemplatesTest extends TestCase
 
         self::assertSame('/api/v1/templates/slug/welcome/locales', $this->http->lastRequest()->getUri()->getPath());
         self::assertSame(['en', 'pl'], array_map(static fn ($t) => $t->locale, $variants));
+    }
+
+    public function testExportDropsIdsSoTheFileTravels(): void
+    {
+        $this->http->push(200, [
+            'version' => 1,
+            'exportedAt' => '2026-09-09T10:00:00.000Z',
+            'templates' => [[
+                'slug' => 'welcome',
+                'locale' => 'en',
+                'name' => 'Welcome',
+                'body' => '<p>Hi</p>',
+                'subject' => 'Hi',
+                'isActive' => true,
+            ]],
+        ]);
+
+        $file = $this->client()->templates->export();
+
+        self::assertSame('GET', $this->http->lastRequest()->getMethod());
+        self::assertSame('/api/v1/templates/export', $this->http->lastRequest()->getUri()->getPath());
+        self::assertSame(1, $file->version);
+        self::assertCount(1, $file);
+        // Identity is slug + locale. There is no id to carry, which is what
+        // makes the file usable in a different account.
+        self::assertSame('welcome', $file->templates[0]->slug);
+        self::assertSame('en', $file->templates[0]->locale);
+    }
+
+    public function testImportLeavesTheConflictPolicyToTheApiByDefault(): void
+    {
+        $this->http->push(200, ['created' => 1, 'updated' => 0, 'skipped' => 0, 'results' => []]);
+
+        $this->client()->templates->import([
+            ['slug' => 'welcome', 'locale' => 'en', 'name' => 'Welcome', 'body' => '<p>Hi</p>'],
+        ]);
+
+        $body = $this->http->lastBody();
+        self::assertSame('POST', $this->http->lastRequest()->getMethod());
+        self::assertSame('/api/v1/templates/import', $this->http->lastRequest()->getUri()->getPath());
+        // Not sent, so the API's own default (skip) applies. An SDK that filled
+        // in 'overwrite' here would replace live templates for someone who
+        // never asked.
+        self::assertArrayNotHasKey('onConflict', $body);
+    }
+
+    public function testImportSendsTheConflictPolicyWhenAsked(): void
+    {
+        $this->http->push(200, ['created' => 0, 'updated' => 1, 'skipped' => 0, 'results' => []]);
+
+        $result = $this->client()->templates->import(
+            [['slug' => 'welcome', 'locale' => 'en', 'name' => 'Welcome', 'body' => '<p>Hi</p>']],
+            ImportConflictPolicy::Overwrite,
+        );
+
+        self::assertSame('overwrite', $this->http->lastBody()['onConflict']);
+        self::assertSame(1, $result->updated);
+    }
+
+    public function testImportAcceptsAnExportStraightBack(): void
+    {
+        $exported = new ExportedTemplate(
+            slug: 'welcome',
+            locale: 'en',
+            name: 'Welcome',
+            body: '<p>Hi</p>',
+        );
+        $this->http->push(200, ['created' => 0, 'updated' => 0, 'skipped' => 1, 'results' => [
+            ['slug' => 'welcome', 'locale' => 'en', 'result' => 'skipped'],
+        ]]);
+
+        $result = $this->client()->templates->import([$exported]);
+
+        // Round-tripping an export object must not need the caller to unpack it.
+        self::assertSame(
+            ['slug' => 'welcome', 'locale' => 'en', 'name' => 'Welcome', 'body' => '<p>Hi</p>', 'isActive' => true],
+            $this->http->lastBody()['templates'][0],
+        );
+        // Skipping is the default and is NOT an error — the call does not
+        // throw, so the count is the only thing that says nothing changed.
+        self::assertSame(1, $result->skipped);
+        self::assertCount(1, $result->skipped());
     }
 }
