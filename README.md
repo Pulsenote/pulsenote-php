@@ -168,6 +168,9 @@ runner, not to a request helper.
 
 The service provider is auto-discovered. Set the key and go:
 
+> The same setup written out end to end, with what to check before it goes
+> live: [Sending email from Laravel](https://pulsenote.eu/send-email/laravel).
+
 ```env
 PULSENOTE_API_KEY=pk_live_...
 ```
@@ -278,6 +281,9 @@ and attachments go on every message.
 
 The transport is a Symfony Mailer transport — Laravel just happens to run on Symfony
 Mailer too. In a Symfony application, register the factory and point the DSN at it:
+
+> The full walkthrough, including the DSN and what a first send does:
+> [Sending email from Symfony](https://pulsenote.eu/send-email/symfony).
 
 ```yaml
 # config/services.yaml
