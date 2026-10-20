@@ -164,6 +164,31 @@ try {
 The SDK does **not** retry for you — back-off policy belongs to your queue or job
 runner, not to a request helper.
 
+### Slack, Teams, Discord, Google Chat and webhooks
+
+Send to a chat channel or an HTTPS endpoint of yours with the same API key and
+monthly allowance as email — and **no sending domain**. Register a destination
+once, then address it by name:
+
+```php
+use Pulsenote\Enum\DestinationType;
+
+// Slack through your own app: api.slack.com/apps → chat:write → install → copy the xoxb- token
+$pulsenote->destinations->create(
+    type: DestinationType::Slack,
+    name: 'ops-alerts',
+    token: getenv('SLACK_BOT_TOKEN'),
+    channel: '#ops-alerts',
+);
+
+$pulsenote->messages->send(to: 'ops-alerts', text: 'Order #1042 — €240.00', title: 'New order');
+```
+
+Every other type takes the `url` its platform gives you (Teams: a Workflows
+webhook). A `Webhook` destination returns `signingSecret` once; each request to
+your endpoint carries `X-Pulsenote-Signature: sha256=<hex HMAC of the raw body>`.
+`destinations->list()`, `test($id)` and `delete($id)` do what they say.
+
 ## Laravel
 
 The service provider is auto-discovered. Set the key and go:
@@ -362,7 +387,7 @@ lands half-applied.
 ## Scope
 
 v1 covers the **data plane** — the endpoints authenticated with your `X-API-Key`
-(notifications, templates, domains). Account-management endpoints (team, billing,
+(notifications, templates, domains, suppressions, destinations). Account-management endpoints (team, billing,
 auth), which use JWT auth, are intentionally out of scope, matching
 [`pulsenote-node`](https://github.com/Pulsenote/pulsenote-node).
 

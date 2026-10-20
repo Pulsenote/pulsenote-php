@@ -11,7 +11,9 @@ use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Pulsenote\Exception\ConfigurationException;
 use Pulsenote\Http\Transport;
+use Pulsenote\Resource\Destinations;
 use Pulsenote\Resource\Domains;
+use Pulsenote\Resource\Messages;
 use Pulsenote\Resource\Suppressions;
 use Pulsenote\Resource\Notifications;
 use Pulsenote\Resource\Templates;
@@ -58,6 +60,12 @@ final class Pulsenote
     /** Addresses this tenant will not send to. */
     public readonly Suppressions $suppressions;
 
+    /** Slack, Teams, Discord, Google Chat and webhook destinations. */
+    public readonly Destinations $destinations;
+
+    /** Messages to a destination, addressed by name. */
+    public readonly Messages $messages;
+
     /**
      * @param string                        $apiKey         Tenant API key (`pk_live_…` / `pk_test_…`), sent as `X-API-Key`.
      * @param string|null                   $baseUrl        Override the API base URL. Defaults to {@see DEFAULT_BASE_URL}.
@@ -93,6 +101,8 @@ final class Pulsenote
         $this->templates = new Templates($transport);
         $this->domains = new Domains($transport);
         $this->suppressions = new Suppressions($transport);
+        $this->destinations = new Destinations($transport);
+        $this->messages = new Messages($transport);
     }
 
     /**
