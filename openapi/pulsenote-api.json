@@ -2,7 +2,7 @@
     "openapi": "3.0.0",
     "info": {
         "title": "Pulsenote API",
-        "description": "Send transactional emails at scale. Authenticate every request with your API key in the `X-API-Key` header. Find your key in the Pulsenote dashboard under Settings \u2192 API Keys.",
+        "description": "Send transactional emails, and messages to Slack, Teams, Discord, Google Chat or webhooks. Authenticate every request with your API key in the `X-API-Key` header. Find your key in the Pulsenote dashboard under Settings \u2192 API Keys.",
         "version": "1.0",
         "contact": {}
     },
@@ -31,6 +31,174 @@
         }
     ],
     "paths": {
+        "/api/v1/destinations": {
+            "get": {
+                "operationId": "listDestinations",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/DestinationDto"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api-key": []
+                    }
+                ],
+                "summary": "List destinations",
+                "tags": [
+                    "Destinations"
+                ]
+            },
+            "post": {
+                "operationId": "createDestination",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateDestinationDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreatedDestinationDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api-key": []
+                    }
+                ],
+                "summary": "Register a Slack, Teams, Discord or Google Chat channel, or a webhook",
+                "tags": [
+                    "Destinations"
+                ]
+            }
+        },
+        "/api/v1/destinations/{id}": {
+            "delete": {
+                "operationId": "deleteDestination",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "security": [
+                    {
+                        "api-key": []
+                    }
+                ],
+                "summary": "Remove a destination",
+                "tags": [
+                    "Destinations"
+                ]
+            }
+        },
+        "/api/v1/destinations/{id}/test": {
+            "post": {
+                "operationId": "testDestination",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DestinationTestDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api-key": []
+                    }
+                ],
+                "summary": "Send a test message now",
+                "tags": [
+                    "Destinations"
+                ]
+            }
+        },
+        "/api/v1/messages": {
+            "post": {
+                "description": "Queues a message for a registered destination and returns at once. It counts towards the same monthly allowance as e-mail. No sending domain is needed.",
+                "operationId": "sendMessage",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SendMessageDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SendMessageResponseDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api-key": []
+                    }
+                ],
+                "summary": "Send a message to a destination",
+                "tags": [
+                    "Destinations"
+                ]
+            }
+        },
         "/api/v1/notifications/send": {
             "post": {
                 "description": "Queues an email for delivery. Returns immediately with the notification ID.\n\n**Sandbox:** if your account has no verified sending domain yet, the message is rendered and stored for preview but never delivered, and the response comes back with `status: \"SANDBOX\"` and `sandbox: true`. Everything else behaves identically \u2014 including the `from` address you pass \u2014 so verifying a domain in Settings is the only change needed to start sending for real. Sandbox is capped at 50 messages/month and does not consume your plan allowance.",
@@ -876,9 +1044,6 @@
                 },
                 "security": [
                     {
-                        "jwt": []
-                    },
-                    {
                         "api-key": []
                     }
                 ],
@@ -914,9 +1079,6 @@
                     }
                 },
                 "security": [
-                    {
-                        "jwt": []
-                    },
                     {
                         "api-key": []
                     }
@@ -956,9 +1118,6 @@
                     }
                 },
                 "security": [
-                    {
-                        "jwt": []
-                    },
                     {
                         "api-key": []
                     }
@@ -1078,6 +1237,169 @@
                 },
                 "required": [
                     "messages"
+                ]
+            },
+            "CreateDestinationDto": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "enum": [
+                            "slack",
+                            "teams",
+                            "discord",
+                            "google_chat",
+                            "webhook"
+                        ],
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "ops-alerts",
+                        "description": "What you will address it by when sending: lower-case letters, digits, \"-\" and \"_\", starting with a letter or digit, at most 63 characters."
+                    },
+                    "url": {
+                        "type": "string",
+                        "maxLength": 2048,
+                        "description": "The webhook URL from Slack, Teams (Workflows), Discord or Google Chat, or your own HTTPS endpoint. Not used for Slack when `token` is given. Stored encrypted and never shown again."
+                    },
+                    "token": {
+                        "type": "string",
+                        "maxLength": 300,
+                        "description": "Slack only: the Bot User OAuth Token (xoxb-\u2026) of your own Slack app with the chat:write scope. Use instead of `url`. Stored encrypted."
+                    },
+                    "channel": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "example": "#ops-alerts",
+                        "description": "Slack only, with `token`: channel name or ID."
+                    }
+                },
+                "required": [
+                    "type",
+                    "name"
+                ]
+            },
+            "CreatedDestinationDto": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "enum": [
+                            "slack",
+                            "teams",
+                            "discord",
+                            "google_chat",
+                            "webhook"
+                        ],
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "displayHint": {
+                        "type": "string",
+                        "description": "The URL with everything secret left out."
+                    },
+                    "brokenAt": {
+                        "format": "date-time",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "brokenReason": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "lastDeliveredAt": {
+                        "format": "date-time",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    },
+                    "signingSecret": {
+                        "type": "string",
+                        "description": "Webhook destinations only. Every request carries `X-Pulsenote-Signature: sha256=<hmac of the body with this secret>`. Shown once."
+                    }
+                },
+                "required": [
+                    "id",
+                    "type",
+                    "name",
+                    "displayHint",
+                    "createdAt"
+                ]
+            },
+            "DestinationDto": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "enum": [
+                            "slack",
+                            "teams",
+                            "discord",
+                            "google_chat",
+                            "webhook"
+                        ],
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "displayHint": {
+                        "type": "string",
+                        "description": "The URL with everything secret left out."
+                    },
+                    "brokenAt": {
+                        "format": "date-time",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "brokenReason": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "lastDeliveredAt": {
+                        "format": "date-time",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "type",
+                    "name",
+                    "displayHint",
+                    "createdAt"
+                ]
+            },
+            "DestinationTestDto": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "enum": [
+                            "sent",
+                            "broken",
+                            "failed"
+                        ],
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "status"
                 ]
             },
             "DnsRecordDto": {
@@ -1744,6 +2066,57 @@
                     "id",
                     "status",
                     "from"
+                ]
+            },
+            "SendMessageDto": {
+                "type": "object",
+                "properties": {
+                    "to": {
+                        "type": "string",
+                        "example": "ops-alerts",
+                        "description": "The name of a destination registered on this account."
+                    },
+                    "title": {
+                        "type": "string",
+                        "maxLength": 150,
+                        "example": "New order"
+                    },
+                    "text": {
+                        "type": "string",
+                        "maxLength": 4000,
+                        "example": "Order #1042 from Ada Lovelace \u2014 \u20ac240.00"
+                    }
+                },
+                "required": [
+                    "to",
+                    "text"
+                ]
+            },
+            "SendMessageResponseDto": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "QUEUED"
+                    },
+                    "channel": {
+                        "enum": [
+                            "slack",
+                            "teams",
+                            "discord",
+                            "google_chat",
+                            "webhook"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "status",
+                    "channel"
                 ]
             },
             "StreamStatsDto": {
