@@ -44,7 +44,7 @@ final class Pulsenote
     public const VERSION = '1.5.0'; // x-release-please-version
 
     /** Default API base URL. */
-    public const DEFAULT_BASE_URL = 'https://pulsenote-api.sysgp.eu';
+    public const DEFAULT_BASE_URL = 'https://api.pulsenote.eu';
 
     /** Sending email and inspecting delivery. */
     public readonly Notifications $notifications;

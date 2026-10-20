@@ -46,10 +46,29 @@ final class PulsenoteTest extends TestCase
         $this->http->push(200, []);
         $this->client()->domains->list();
 
+        // The literal, not the constant: comparing the constant with itself is
+        // how a default pointing at a decommissioned staging host shipped in
+        // every release up to 1.5.0 with this test green.
         self::assertSame(
-            Pulsenote::DEFAULT_BASE_URL . '/api/v1/domains',
+            'https://api.pulsenote.eu/api/v1/domains',
             (string) $this->http->lastRequest()->getUri(),
         );
+    }
+
+    public function testTheDefaultBaseUrlIsTheSpecsProductionServer(): void
+    {
+        /** @var array{servers: list<array{url: string, description?: string}>} $spec */
+        $spec = json_decode(
+            (string) file_get_contents(__DIR__ . '/../openapi/pulsenote-api.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+        $production = array_values(array_filter(
+            $spec['servers'],
+            static fn (array $s): bool => ($s['description'] ?? '') === 'Production',
+        ));
+
+        self::assertSame($production[0]['url'] ?? null, Pulsenote::DEFAULT_BASE_URL);
     }
 
     public function testHonoursACustomBaseUrlAndTrimsTheTrailingSlash(): void
