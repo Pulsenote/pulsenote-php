@@ -4,6 +4,18 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0](https://github.com/Pulsenote/pulsenote-php/compare/1.5.0...1.6.0) (2026-10-20)
+
+
+### Features
+
+* destinations and messages — Slack, Teams, Discord, Google Chat and webhooks ([#21](https://github.com/Pulsenote/pulsenote-php/issues/21)) ([52ee9fa](https://github.com/Pulsenote/pulsenote-php/commit/52ee9fae68c1093a3f703fd8026778679850425d))
+
+
+### Bug Fixes
+
+* default to the production API, not a decommissioned staging host ([#20](https://github.com/Pulsenote/pulsenote-php/issues/20)) ([4bc9418](https://github.com/Pulsenote/pulsenote-php/commit/4bc9418093bc5a87562245d7df25da104f706406))
+
 ## [1.5.0](https://github.com/Pulsenote/pulsenote-php/compare/1.4.0...1.5.0) (2026-09-09)
 
 
