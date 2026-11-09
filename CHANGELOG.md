@@ -4,6 +4,13 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0](https://github.com/Pulsenote/pulsenote-php/compare/1.6.0...1.7.0) (2026-11-09)
+
+
+### Features
+
+* **laravel:** pulsenote-chat notification channel for Slack, Teams, Discord and Google Chat ([#24](https://github.com/Pulsenote/pulsenote-php/issues/24)) ([ce216d2](https://github.com/Pulsenote/pulsenote-php/commit/ce216d232acaffe5449da6b389dd9f8dad34126f))
+
 ## [1.6.0](https://github.com/Pulsenote/pulsenote-php/compare/1.5.0...1.6.0) (2026-10-20)
 
 
