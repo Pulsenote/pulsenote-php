@@ -16,6 +16,7 @@ declare(strict_types=1);
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
+use Pulsenote\Laravel\PulsenoteChatMessage;
 use Pulsenote\Laravel\PulsenoteMessage;
 
 /**
@@ -52,6 +53,46 @@ final class OrderShipped extends Notification implements ShouldQueue
 // `mail` route, then to an `email` attribute:
 //
 //   public function routeNotificationForPulsenote(): string { return $this->work_email; }
+
+/**
+ * 1b. Email and a Teams (or Slack, Discord, Google Chat) post from one notification —
+ *     the `pulsenote` channel sends the email, `pulsenote-chat` the post. Each is
+ *     queued and retried on its own, so a Teams outage never resends the email.
+ */
+final class OrderPlaced extends Notification implements ShouldQueue
+{
+    use Queueable;
+
+    public function __construct(private readonly string $number, private readonly string $total)
+    {
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function via(object $notifiable): array
+    {
+        return ['pulsenote', 'pulsenote-chat'];
+    }
+
+    public function toPulsenote(object $notifiable): PulsenoteMessage
+    {
+        return PulsenoteMessage::make()
+            ->subject("Thanks for your order #{$this->number}")
+            ->template('order-placed')
+            ->data(['number' => $this->number]);
+    }
+
+    public function toPulsenoteChat(object $notifiable): PulsenoteChatMessage
+    {
+        return PulsenoteChatMessage::make("Order #{$this->number} — {$this->total}")
+            ->title('New order')
+            ->to('sales-teams');
+    }
+}
+
+// Without ->to(), the destination comes from the notifiable's
+// routeNotificationForPulsenoteChat(), then from PULSENOTE_CHAT_DESTINATION.
 
 /**
  * 2. Injected directly — the container binds the client as a singleton.
