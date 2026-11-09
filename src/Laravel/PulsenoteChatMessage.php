@@ -7,7 +7,8 @@ namespace Pulsenote\Laravel;
 /**
  * What a notification's `toPulsenoteChat()` returns — a fluent builder over the
  * arguments of {@see \Pulsenote\Resource\Messages::send()}: a message to a
- * registered destination (Slack, Teams, Discord, Google Chat or a webhook).
+ * registered destination (Slack, Teams, Discord, Google Chat or a webhook), sent by
+ * the `pulsenote-chat` channel ({@see PulsenoteChatChannel}).
  *
  * ```php
  * public function toPulsenoteChat(object $notifiable): PulsenoteChatMessage

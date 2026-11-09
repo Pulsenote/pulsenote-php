@@ -56,7 +56,8 @@ final class OrderShipped extends Notification implements ShouldQueue
 
 /**
  * 1b. Email and a Teams (or Slack, Discord, Google Chat) post from one notification —
- *     add toPulsenoteChat() and the same `pulsenote` channel sends both.
+ *     the `pulsenote` channel sends the email, `pulsenote-chat` the post. Each is
+ *     queued and retried on its own, so a Teams outage never resends the email.
  */
 final class OrderPlaced extends Notification implements ShouldQueue
 {
@@ -71,7 +72,7 @@ final class OrderPlaced extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['pulsenote'];
+        return ['pulsenote', 'pulsenote-chat'];
     }
 
     public function toPulsenote(object $notifiable): PulsenoteMessage

@@ -7,14 +7,11 @@ namespace Pulsenote\Laravel;
 use Illuminate\Notifications\Notification;
 use Pulsenote\Exception\ConfigurationException;
 use Pulsenote\Model\SendEmailResponse;
-use Pulsenote\Model\SendMessageResponse;
 use Pulsenote\Pulsenote;
 
 /**
  * Laravel notification channel. Put `'pulsenote'` in your notification's `via()` and
- * give it a `toPulsenote()` returning a {@see PulsenoteMessage} (email), a
- * `toPulsenoteChat()` returning a {@see PulsenoteChatMessage} (Slack, Teams, Discord,
- * Google Chat or a webhook), or both — then both are sent.
+ * give it a `toPulsenote()` returning a {@see PulsenoteMessage}.
  *
  * ```php
  * public function via(object $notifiable): array { return ['pulsenote']; }
@@ -23,83 +20,28 @@ use Pulsenote\Pulsenote;
  * {
  *     return PulsenoteMessage::make()->subject('Welcome')->html('<b>Hi</b>');
  * }
- *
- * public function toPulsenoteChat(object $notifiable): PulsenoteChatMessage
- * {
- *     return PulsenoteChatMessage::make('New sign-up')->to('sales-teams');
- * }
  * ```
  *
- * Both messages are built and addressed before anything is sent, so a missing
- * recipient or destination fails without half the notification going out. Then the
- * email goes first and the chat message second.
- *
  * Failures propagate as {@see \Pulsenote\Exception\PulsenoteException} subclasses, so a
- * queued notification fails (and retries) on the usual Laravel path. When both are
- * defined and the chat message fails after the email was accepted, a retry sends the
- * email again — the API has no idempotency key to prevent that.
+ * queued notification fails (and retries) on the usual Laravel path.
  */
 final class PulsenoteChannel
 {
-    /**
-     * @param string|null $defaultChatDestination Used when neither the chat message nor
-     *                                            the notifiable names a destination —
-     *                                            `pulsenote.chat_destination` in config.
-     */
-    public function __construct(
-        private readonly Pulsenote $pulsenote,
-        private readonly ?string $defaultChatDestination = null,
-    ) {
+    public function __construct(private readonly Pulsenote $pulsenote)
+    {
     }
 
-    /**
-     * @return SendEmailResponse|SendMessageResponse|PulsenoteSent The email response for
-     *         an email-only notification (as before), the message response for a
-     *         chat-only one, and both together when the notification defines both.
-     */
-    public function send(mixed $notifiable, Notification $notification): SendEmailResponse|SendMessageResponse|PulsenoteSent
+    public function send(mixed $notifiable, Notification $notification): SendEmailResponse
     {
-        // Build and address everything before sending anything: a mistake in the chat
-        // half must not surface only after the email has already gone out.
-        $email = null;
-        if (method_exists($notification, 'toPulsenote')) {
-            $message = $this->checkEmail($notification->toPulsenote($notifiable), $notification);
-            $to = $message->to ?? $this->resolveRecipient($notifiable, $notification);
-            $email = fn (): SendEmailResponse => $this->sendEmail($message, $to);
+        if (!method_exists($notification, 'toPulsenote')) {
+            throw new ConfigurationException(sprintf(
+                'Pulsenote: %s uses the "pulsenote" channel but has no toPulsenote() method.',
+                $notification::class,
+            ));
         }
 
-        $chat = null;
-        if (method_exists($notification, 'toPulsenoteChat')) {
-            $chatMessage = $this->checkChat($notification->toPulsenoteChat($notifiable), $notification);
-            $text = $this->chatText($chatMessage, $notification);
-            $destination = $this->resolveDestination($chatMessage, $notifiable, $notification);
-            $chat = fn (): SendMessageResponse => $this->pulsenote->messages->send(
-                to: $destination,
-                text: $text,
-                title: $chatMessage->title,
-            );
-        }
+        $message = $notification->toPulsenote($notifiable);
 
-        if ($email !== null && $chat !== null) {
-            // Email first: if it fails, nothing has gone out and a retry starts clean.
-            return new PulsenoteSent($email(), $chat());
-        }
-        if ($email !== null) {
-            return $email();
-        }
-        if ($chat !== null) {
-            return $chat();
-        }
-
-        throw new ConfigurationException(sprintf(
-            'Pulsenote: %s uses the "pulsenote" channel but has no toPulsenote() method (email) '
-            . 'or toPulsenoteChat() method (Slack, Teams, Discord, Google Chat, webhook).',
-            $notification::class,
-        ));
-    }
-
-    private function checkEmail(mixed $message, Notification $notification): PulsenoteMessage
-    {
         if (!$message instanceof PulsenoteMessage) {
             throw new ConfigurationException(sprintf(
                 'Pulsenote: %s::toPulsenote() must return a %s, got %s.',
@@ -109,11 +51,8 @@ final class PulsenoteChannel
             ));
         }
 
-        return $message;
-    }
+        $to = $message->to ?? $this->resolveRecipient($notifiable, $notification);
 
-    private function sendEmail(PulsenoteMessage $message, string $to): SendEmailResponse
-    {
         return $this->pulsenote->notifications->send(
             to: $to,
             subject: $message->subject,
@@ -129,63 +68,6 @@ final class PulsenoteChannel
             locale: $message->locale,
             templateData: $message->templateData,
         );
-    }
-
-    private function checkChat(mixed $message, Notification $notification): PulsenoteChatMessage
-    {
-        if (!$message instanceof PulsenoteChatMessage) {
-            throw new ConfigurationException(sprintf(
-                'Pulsenote: %s::toPulsenoteChat() must return a %s, got %s.',
-                $notification::class,
-                PulsenoteChatMessage::class,
-                get_debug_type($message),
-            ));
-        }
-
-        return $message;
-    }
-
-    private function chatText(PulsenoteChatMessage $message, Notification $notification): string
-    {
-        if ($message->text === null || $message->text === '') {
-            throw new ConfigurationException(sprintf(
-                'Pulsenote: %s::toPulsenoteChat() returned a message without text. '
-                . 'Pass it to PulsenoteChatMessage::make() or ->text().',
-                $notification::class,
-            ));
-        }
-
-        return $message->text;
-    }
-
-    /**
-     * The message's own `->to()`, then the notifiable's `pulsenote-chat` route
-     * (`routeNotificationForPulsenoteChat()`, or `Notification::route('pulsenote-chat', …)`
-     * on demand), then `pulsenote.chat_destination` in config.
-     */
-    private function resolveDestination(PulsenoteChatMessage $message, mixed $notifiable, Notification $notification): string
-    {
-        if ($message->to !== null && $message->to !== '') {
-            return $message->to;
-        }
-
-        if (is_object($notifiable) && method_exists($notifiable, 'routeNotificationFor')) {
-            $route = $notifiable->routeNotificationFor('pulsenote-chat', $notification);
-
-            if (is_string($route) && $route !== '') {
-                return $route;
-            }
-        }
-
-        if ($this->defaultChatDestination !== null && $this->defaultChatDestination !== '') {
-            return $this->defaultChatDestination;
-        }
-
-        throw new ConfigurationException(sprintf(
-            'Pulsenote: no destination for %s::toPulsenoteChat(). Set ->to() on the PulsenoteChatMessage, '
-            . 'add routeNotificationForPulsenoteChat() to the notifiable, or set PULSENOTE_CHAT_DESTINATION.',
-            $notification::class,
-        ));
     }
 
     /**

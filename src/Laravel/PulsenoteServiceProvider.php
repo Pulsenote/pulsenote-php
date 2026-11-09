@@ -17,8 +17,9 @@ use Pulsenote\Pulsenote;
  * Laravel integration — registered automatically by package discovery.
  *
  * Binds {@see Pulsenote} as a singleton (inject it anywhere), publishes
- * `config/pulsenote.php`, and registers both the `pulsenote` notification channel
- * and the `pulsenote` mail transport (`MAIL_MAILER=pulsenote`).
+ * `config/pulsenote.php`, and registers the `pulsenote` (email) and `pulsenote-chat`
+ * (Slack, Teams, Discord, Google Chat, webhooks) notification channels and the
+ * `pulsenote` mail transport (`MAIL_MAILER=pulsenote`).
  *
  * This class is only loaded inside a Laravel application; nothing else in the SDK
  * touches Illuminate.
@@ -52,12 +53,12 @@ final class PulsenoteServiceProvider extends ServiceProvider
 
         $this->app->alias(Pulsenote::class, 'pulsenote');
 
-        $this->app->bind(PulsenoteChannel::class, static function (Container $app): PulsenoteChannel {
+        $this->app->bind(PulsenoteChatChannel::class, static function (Container $app): PulsenoteChatChannel {
             /** @var Repository $config */
             $config = $app->make('config');
             $destination = $config->get('pulsenote.chat_destination');
 
-            return new PulsenoteChannel(
+            return new PulsenoteChatChannel(
                 $app->make(Pulsenote::class),
                 is_string($destination) && trim($destination) !== '' ? trim($destination) : null,
             );
@@ -81,6 +82,7 @@ final class PulsenoteServiceProvider extends ServiceProvider
         // why the mail transport was unaffected.
         $this->app->resolving(ChannelManager::class, static function (ChannelManager $manager, Container $app): void {
             $manager->extend('pulsenote', fn (): PulsenoteChannel => $app->make(PulsenoteChannel::class));
+            $manager->extend('pulsenote-chat', fn (): PulsenoteChatChannel => $app->make(PulsenoteChatChannel::class));
         });
 
         // Same deferral for the mail transport. Registering the driver is free; the
