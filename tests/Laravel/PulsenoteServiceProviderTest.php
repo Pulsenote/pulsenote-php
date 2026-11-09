@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace Pulsenote\Tests\Laravel;
 
+use GuzzleHttp\Psr7\HttpFactory;
 use Illuminate\Config\Repository;
+use Illuminate\Notifications\ChannelManager;
 use PHPUnit\Framework\TestCase;
 use Pulsenote\Exception\ConfigurationException;
+use Pulsenote\Laravel\PulsenoteChannel;
+use Pulsenote\Laravel\PulsenoteChatMessage;
 use Pulsenote\Laravel\PulsenoteServiceProvider;
 use Pulsenote\Pulsenote;
 use Pulsenote\Tests\Support\FakeApplication;
+use Pulsenote\Tests\Support\MockHttpClient;
 
 /**
  * Container wiring, checked against {@see FakeApplication} rather than a booted app —
@@ -98,5 +103,55 @@ final class PulsenoteServiceProviderTest extends TestCase
         } finally {
             putenv('PULSENOTE_API_KEY');
         }
+    }
+
+    /**
+     * @return iterable<string,array{0: mixed, 1: string|null}>
+     */
+    public static function chatDestinationConfig(): iterable
+    {
+        yield 'set' => ['ops-alerts', 'ops-alerts'];
+        yield 'padded' => ['  ops-alerts ', 'ops-alerts'];
+        yield 'empty' => ['', null];
+        yield 'unset' => [null, null];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('chatDestinationConfig')]
+    public function testTheChannelGetsTheConfiguredChatDestination(mixed $configured, ?string $expected): void
+    {
+        $app = $this->boot(['api_key' => 'pk_test_abc', 'chat_destination' => $configured]);
+
+        $http = new MockHttpClient();
+        $factory = new HttpFactory();
+        $app->instance(Pulsenote::class, new Pulsenote(
+            apiKey: 'pk_test_abc',
+            httpClient: $http,
+            requestFactory: $factory,
+            streamFactory: $factory,
+        ));
+
+        // Resolved the way Laravel does it: Illuminate's NotificationServiceProvider binds
+        // the manager like this, and ours extends it as it resolves.
+        $app->singleton(ChannelManager::class, static fn (FakeApplication $app): ChannelManager => new ChannelManager($app));
+        $channel = $app->make(ChannelManager::class)->driver('pulsenote');
+        self::assertInstanceOf(PulsenoteChannel::class, $channel);
+
+        $notification = new class () extends \Illuminate\Notifications\Notification {
+            public function toPulsenoteChat(mixed $notifiable): PulsenoteChatMessage
+            {
+                return PulsenoteChatMessage::make('Hi');
+            }
+        };
+
+        if ($expected === null) {
+            $this->expectException(ConfigurationException::class);
+            $this->expectExceptionMessage('PULSENOTE_CHAT_DESTINATION');
+        } else {
+            $http->push(202, ['id' => 'm-1', 'status' => 'QUEUED', 'channel' => 'slack']);
+        }
+
+        $channel->send(new \stdClass(), $notification);
+
+        self::assertSame($expected, json_decode((string) $http->lastRequest()->getBody(), true)['to']);
     }
 }

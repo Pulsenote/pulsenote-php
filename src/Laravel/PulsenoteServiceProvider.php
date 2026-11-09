@@ -51,6 +51,17 @@ final class PulsenoteServiceProvider extends ServiceProvider
         });
 
         $this->app->alias(Pulsenote::class, 'pulsenote');
+
+        $this->app->bind(PulsenoteChannel::class, static function (Container $app): PulsenoteChannel {
+            /** @var Repository $config */
+            $config = $app->make('config');
+            $destination = $config->get('pulsenote.chat_destination');
+
+            return new PulsenoteChannel(
+                $app->make(Pulsenote::class),
+                is_string($destination) && trim($destination) !== '' ? trim($destination) : null,
+            );
+        });
     }
 
     public function boot(): void

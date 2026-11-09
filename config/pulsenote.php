@@ -25,4 +25,12 @@ return [
      * @var array<string,string>
      */
     'headers' => [],
+
+    /*
+     * Destination name used by a notification's toPulsenoteChat() when neither the
+     * PulsenoteChatMessage (->to()) nor the notifiable (routeNotificationForPulsenoteChat())
+     * names one. Register destinations in Settings → Destinations or with
+     * $pulsenote->destinations->create().
+     */
+    'chat_destination' => env('PULSENOTE_CHAT_DESTINATION'),
 ];

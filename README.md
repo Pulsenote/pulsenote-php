@@ -240,6 +240,67 @@ then an `email` attribute — so existing `Notifiable` models work unchanged. Ad
 `routeNotificationForPulsenote()` to override. API failures propagate, so a queued
 notification retries on Laravel's normal path.
 
+#### Email and Teams from one notification
+
+Add `toPulsenoteChat()` next to `toPulsenote()` and the same `pulsenote` channel
+sends both: the email to the customer, and a post to a Slack, Teams, Discord or
+Google Chat [destination](#slack-teams-discord-google-chat-and-webhooks) — `via()`
+does not change.
+
+```php
+use Pulsenote\Laravel\PulsenoteChatMessage;
+use Pulsenote\Laravel\PulsenoteMessage;
+
+class OrderPlaced extends Notification implements ShouldQueue
+{
+    use Queueable;
+
+    public function __construct(private readonly Order $order) {}
+
+    public function via(object $notifiable): array
+    {
+        return ['pulsenote'];
+    }
+
+    public function toPulsenote(object $notifiable): PulsenoteMessage
+    {
+        return PulsenoteMessage::make()
+            ->subject("Thanks for your order #{$this->order->number}")
+            ->template('order-placed')
+            ->data(['number' => $this->order->number]);
+    }
+
+    public function toPulsenoteChat(object $notifiable): PulsenoteChatMessage
+    {
+        return PulsenoteChatMessage::make("Order #{$this->order->number} — {$this->order->total}")
+            ->title('New order')
+            ->to('sales-teams');   // a destination registered on your account
+    }
+}
+```
+
+`PulsenoteChatMessage` carries what the messages API takes: `text` (up to 4000
+characters), an optional `title` (up to 150) and the destination name. Define only
+`toPulsenoteChat()` to post without sending email.
+
+The destination resolves from, in order:
+
+1. `->to('sales-teams')` on the message;
+2. the notifiable's `pulsenote-chat` route — `routeNotificationForPulsenoteChat()`,
+   or `Notification::route('pulsenote-chat', 'sales-teams')` on demand;
+3. `PULSENOTE_CHAT_DESTINATION` (`pulsenote.chat_destination` in config).
+
+Both messages are built and addressed before anything is sent, so a missing recipient
+or destination throws a `ConfigurationException` and nothing goes out. Then the email
+goes first and the chat message second; API errors propagate exactly as for email —
+an unknown destination is a `NotFoundException`. **If the chat post fails after the
+email was accepted, a retry of a queued notification sends the email again.**
+
+The channel returns the `SendEmailResponse` for an email-only notification (as
+before), a `SendMessageResponse` for a chat-only one, and a `PulsenoteSent` with
+`->email` and `->chat` when both were sent — Laravel passes it to `NotificationSent`
+listeners as `$event->response`.
+
 See [`examples/laravel-notification.php`](examples/laravel-notification.php).
 
 ### Mail transport — `MAIL_MAILER=pulsenote`
