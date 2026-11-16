@@ -1489,6 +1489,7 @@
                     },
                     "region": {
                         "type": "string",
+                        "nullable": true,
                         "description": "AWS SES region this domain sends from (null = platform default)."
                     },
                     "status": {
@@ -1608,6 +1609,7 @@
                     "metadata": {
                         "type": "object",
                         "additionalProperties": true,
+                        "nullable": true,
                         "description": "Arbitrary template metadata."
                     },
                     "isActive": {
@@ -1629,6 +1631,11 @@
                         "type": "number",
                         "description": "Format version of the file being imported. Defaults to the current version.",
                         "example": 1
+                    },
+                    "exportedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "When the file was exported. Ignored; accepted so an export can be imported unchanged."
                     },
                     "templates": {
                         "type": "array",
@@ -1691,11 +1698,13 @@
                     },
                     "templateId": {
                         "type": "string",
+                        "nullable": true,
                         "description": "ID of the template used, if any.",
                         "format": "uuid"
                     },
                     "templateName": {
                         "type": "string",
+                        "nullable": true,
                         "description": "Name of the template used, if any."
                     },
                     "fromAddress": {
@@ -1717,25 +1726,30 @@
                     },
                     "providerMessageId": {
                         "type": "string",
+                        "nullable": true,
                         "description": "Upstream provider (SES) message ID."
                     },
                     "sentAt": {
                         "type": "string",
+                        "nullable": true,
                         "format": "date-time",
                         "description": "When the email was handed to the provider."
                     },
                     "deliveredAt": {
                         "type": "string",
+                        "nullable": true,
                         "format": "date-time",
                         "description": "When delivery was confirmed."
                     },
                     "failedAt": {
                         "type": "string",
+                        "nullable": true,
                         "format": "date-time",
                         "description": "When the send failed."
                     },
                     "failureReason": {
                         "type": "string",
+                        "nullable": true,
                         "description": "Reason for failure, if failed or bounced."
                     },
                     "createdAt": {
