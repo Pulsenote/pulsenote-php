@@ -201,7 +201,7 @@
         },
         "/api/v1/notifications/send": {
             "post": {
-                "description": "Queues an email for delivery. Returns immediately with the notification ID.\n\n**Sandbox:** if your account has no verified sending domain yet, the message is rendered and stored for preview but never delivered, and the response comes back with `status: \"SANDBOX\"` and `sandbox: true`. Everything else behaves identically \u2014 including the `from` address you pass \u2014 so verifying a domain in Settings is the only change needed to start sending for real. Sandbox is capped at 50 messages/month and does not consume your plan allowance.",
+                "description": "Queues an email for delivery. Returns immediately with the notification ID.\n\n**Sandbox:** if your account has no verified sending domain yet, the message is rendered and stored for preview but never delivered, and the response comes back with `status: \"SANDBOX\"` and `sandbox: true`. Everything else behaves identically \u2014 including the `from` address you pass \u2014 so verifying a domain under Domains in the dashboard is the only change needed to start sending for real. Sandbox is capped at 50 messages/month and does not consume your plan allowance.",
                 "operationId": "sendNotification",
                 "parameters": [],
                 "requestBody": {
@@ -1489,6 +1489,7 @@
                     },
                     "region": {
                         "type": "string",
+                        "nullable": true,
                         "description": "AWS SES region this domain sends from (null = platform default)."
                     },
                     "status": {
@@ -1608,6 +1609,7 @@
                     "metadata": {
                         "type": "object",
                         "additionalProperties": true,
+                        "nullable": true,
                         "description": "Arbitrary template metadata."
                     },
                     "isActive": {
@@ -1629,6 +1631,11 @@
                         "type": "number",
                         "description": "Format version of the file being imported. Defaults to the current version.",
                         "example": 1
+                    },
+                    "exportedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "When the file was exported. Ignored; accepted so an export can be imported unchanged."
                     },
                     "templates": {
                         "type": "array",
@@ -1691,11 +1698,13 @@
                     },
                     "templateId": {
                         "type": "string",
+                        "nullable": true,
                         "description": "ID of the template used, if any.",
                         "format": "uuid"
                     },
                     "templateName": {
                         "type": "string",
+                        "nullable": true,
                         "description": "Name of the template used, if any."
                     },
                     "fromAddress": {
@@ -1717,25 +1726,30 @@
                     },
                     "providerMessageId": {
                         "type": "string",
+                        "nullable": true,
                         "description": "Upstream provider (SES) message ID."
                     },
                     "sentAt": {
                         "type": "string",
+                        "nullable": true,
                         "format": "date-time",
                         "description": "When the email was handed to the provider."
                     },
                     "deliveredAt": {
                         "type": "string",
+                        "nullable": true,
                         "format": "date-time",
                         "description": "When delivery was confirmed."
                     },
                     "failedAt": {
                         "type": "string",
+                        "nullable": true,
                         "format": "date-time",
                         "description": "When the send failed."
                     },
                     "failureReason": {
                         "type": "string",
+                        "nullable": true,
                         "description": "Reason for failure, if failed or bounced."
                     },
                     "createdAt": {
@@ -1840,6 +1854,10 @@
                         "type": "number",
                         "description": "Total notifications sent this calendar month."
                     },
+                    "previousMonthToDate": {
+                        "type": "number",
+                        "description": "Notifications in the previous calendar month up to the same point \u2014 the comparison for thisMonth, which a whole month would always beat."
+                    },
                     "daily": {
                         "type": "array",
                         "description": "Per-day counts by status for the last 30 days.",
@@ -1877,16 +1895,26 @@
                         "items": {
                             "$ref": "#/components/schemas/StreamStatsDto"
                         }
+                    },
+                    "periods": {
+                        "description": "The last 30 days and the 30 before, with the same rates: what a trend is read from. The all-time rates above barely move.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/StatsPeriodsDto"
+                            }
+                        ]
                     }
                 },
                 "required": [
                     "total",
                     "counts",
                     "thisMonth",
+                    "previousMonthToDate",
                     "daily",
                     "engagement",
                     "rates",
-                    "byStream"
+                    "byStream",
+                    "periods"
                 ]
             },
             "PaginationMetaDto": {
@@ -2117,6 +2145,86 @@
                     "id",
                     "status",
                     "channel"
+                ]
+            },
+            "StatsPeriodDto": {
+                "type": "object",
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Window start, inclusive."
+                    },
+                    "to": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Window end, exclusive."
+                    },
+                    "total": {
+                        "type": "number",
+                        "description": "Notifications created in the window."
+                    },
+                    "counts": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        },
+                        "description": "Count keyed by status, for the window.",
+                        "example": {
+                            "DELIVERED": 120,
+                            "BOUNCED": 3
+                        }
+                    },
+                    "processed": {
+                        "type": "number",
+                        "description": "Messages with an outcome: the denominator of the delivery and bounce rates (queued, pending and sandbox messages excluded)."
+                    },
+                    "accepted": {
+                        "type": "number",
+                        "description": "Messages the provider accepted (SENT or DELIVERED)."
+                    },
+                    "complaints": {
+                        "type": "number",
+                        "description": "Messages reported as spam."
+                    },
+                    "rates": {
+                        "$ref": "#/components/schemas/NotificationRatesDto"
+                    }
+                },
+                "required": [
+                    "from",
+                    "to",
+                    "total",
+                    "counts",
+                    "processed",
+                    "accepted",
+                    "complaints",
+                    "rates"
+                ]
+            },
+            "StatsPeriodsDto": {
+                "type": "object",
+                "properties": {
+                    "current": {
+                        "description": "The last 30 days, ending now.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/StatsPeriodDto"
+                            }
+                        ]
+                    },
+                    "previous": {
+                        "description": "The 30 days before that.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/StatsPeriodDto"
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "current",
+                    "previous"
                 ]
             },
             "StreamStatsDto": {
